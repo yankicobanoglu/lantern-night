@@ -8,6 +8,7 @@ import { hash01 } from '../engine/rng';
 import { SlowTick } from '../engine/ticker';
 import { PALETTE } from '../palette';
 import type { MoonFrame } from '../ritual/moonPhase';
+import { Cozy } from './cozy';
 import { Fireflies } from './fireflies';
 import { drawHills, type Window } from './hills';
 import { Lake } from './lake';
@@ -23,6 +24,7 @@ export class Scene {
   readonly lanterns: LanternField;
   readonly skyLights: SkyLights;
   readonly fireflies: Fireflies;
+  readonly cozy: Cozy;
   /** Time multiplier for the animated parts (test hook; 1 in normal use). */
   speed = 1;
   private lake: Lake;
@@ -54,13 +56,14 @@ export class Scene {
     this.lanterns.existingSky = () => this.skyLights.points;
     this.lanterns.onHandOff = (h) => this.skyLights.add({ seed: h.seed, sky: h.sky, status: 'rising' });
     this.fireflies = new Fireflies(layout, seed, motion);
+    this.cozy = new Cozy(layout, seed);
 
     // Pixel layers, back to front.
-    this.pipeline.above.addChild(this.staticSprite, this.overlaySprite, this.skyLights.sprite, this.moon.sprite, this.lanterns.aboveLayer);
+    this.pipeline.above.addChild(this.staticSprite, this.overlaySprite, this.cozy.smokeSprite, this.skyLights.sprite, this.moon.sprite, this.lanterns.aboveLayer);
     this.lake = new Lake(layout, this.pipeline.aboveRT);
-    this.pipeline.world.addChild(this.lake.container, this.lanterns.nearLayer, this.shoreSprite, this.fireflies.sprite);
+    this.pipeline.world.addChild(this.lake.container, this.cozy.boatSprite, this.lanterns.nearLayer, this.shoreSprite, this.fireflies.sprite);
     // Light layer: sky halos under the lanterns' own light, fireflies on top.
-    this.pipeline.light.addChild(this.skyLights.halos, this.lanterns.lightLayer, this.fireflies.light);
+    this.pipeline.light.addChild(this.cozy.light, this.skyLights.halos, this.lanterns.lightLayer, this.fireflies.light);
 
     this.slow = new SlowTick(SLOW_TICK_HZ, (t) => this.slowTick(t));
     this.build(layout);
@@ -73,7 +76,9 @@ export class Scene {
 
     this.staticBuf = new PixelBuffer(layout.width, layout.hillsEnd);
     this.stars = drawSky(this.staticBuf, layout, this.seed);
-    this.windows = drawHills(this.staticBuf, layout, this.seed);
+    const features = drawHills(this.staticBuf, layout, this.seed);
+    this.windows = features.windows;
+    this.cozy.build(layout, features.windows, features.chimneys);
     this.staticSprite.texture = this.staticBuf.toTexture();
 
     this.overlayBuf = new PixelBuffer(layout.width, layout.hillsEnd);
@@ -112,6 +117,7 @@ export class Scene {
     this.lanterns.update(dt / 1000, tSec);
     this.skyLights.update(tSec);
     this.fireflies.update(dt / 1000, tSec);
+    this.cozy.update(tSec);
     this.pipeline.render();
   }
 
@@ -138,5 +144,6 @@ export class Scene {
     this.lake.slowTick(tick);
     this.skyLights.drawTick(tick);
     this.fireflies.drawTick(tick);
+    this.cozy.drawTick(tick);
   }
 }

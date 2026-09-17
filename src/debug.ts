@@ -64,6 +64,8 @@ export type LanternDebug = {
   release: () => void;
   /** Time multiplier for the scene (not for input). */
   speed: (x: number) => void;
+  /** The live scene, for manual inspection in dev. */
+  scene: Scene;
   ready: boolean;
 };
 
@@ -121,6 +123,7 @@ export function installDebug(
     speed: (x) => {
       scene.speed = x;
     },
+    scene,
     ready: false,
   };
 }

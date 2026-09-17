@@ -20,10 +20,12 @@ export class LightUi {
     this.root = root;
     root.innerHTML = `
       <div class="breath" aria-hidden="true"></div>
-      <p class="hint" role="status" aria-live="polite"></p>
-      <div class="actions">
-        <button type="button" class="btn ghost" data-action="light">${COPY.light.tapAlternative}</button>
-        <button type="button" class="btn primary" data-action="release">${COPY.release.letItRise}</button>
+      <div class="panel">
+        <p class="hint" role="status" aria-live="polite"></p>
+        <div class="actions">
+          <button type="button" class="btn ghost" data-action="light">${COPY.light.tapAlternative}</button>
+          <button type="button" class="btn primary" data-action="release">${COPY.release.letItRise}</button>
+        </div>
       </div>`;
     this.ring = root.querySelector('.breath') as HTMLElement;
     this.hint = root.querySelector('.hint') as HTMLElement;
@@ -48,8 +50,30 @@ export class LightUi {
     this.root.style.setProperty('--lantern-y', `${cssY}px`);
   }
 
+  private fadeTimer = 0;
+  private pendingText: string | null = null;
+
+  /** Cross-fade to a new line instead of swapping the text. */
   private say(text: string): void {
-    this.hint.textContent = text;
+    if (this.pendingText === text || (this.pendingText === null && this.hint.textContent === text)) return;
+    this.pendingText = text;
+    window.clearTimeout(this.fadeTimer);
+    if (!this.hint.textContent) {
+      this.hint.textContent = text;
+      this.pendingText = null;
+      return;
+    }
+    this.hint.classList.add('fading');
+    this.fadeTimer = window.setTimeout(() => {
+      this.hint.textContent = text;
+      this.hint.classList.remove('fading');
+      this.pendingText = null;
+    }, 260);
+  }
+
+  private syncActions(): void {
+    const actions = this.root.querySelector('.actions') as HTMLElement;
+    actions.dataset['empty'] = String(this.lightBtn.hidden && this.releaseBtn.hidden);
   }
 
   idle(): void {
@@ -59,6 +83,7 @@ export class LightUi {
     this.ring.classList.remove('holding', 'done');
     this.lightBtn.hidden = false;
     this.releaseBtn.hidden = true;
+    this.syncActions();
   }
 
   holding(holding: boolean): void {
@@ -75,6 +100,7 @@ export class LightUi {
     this.ring.classList.add('done');
     this.lightBtn.hidden = true;
     this.releaseBtn.hidden = false;
+    this.syncActions();
     window.clearTimeout(this.hintTimer);
     this.hintTimer = window.setTimeout(() => this.say(COPY.light.hint), 2600);
   }
@@ -84,6 +110,7 @@ export class LightUi {
     this.ring.classList.remove('holding', 'done');
     this.lightBtn.hidden = true;
     this.releaseBtn.hidden = true;
+    this.syncActions();
     this.say(COPY.release.gone);
     window.clearTimeout(this.hintTimer);
     this.hintTimer = window.setTimeout(() => this.say(mode === 'wish' ? COPY.release.wish : COPY.release.letGo), 1800);
@@ -93,5 +120,6 @@ export class LightUi {
     this.root.dataset['state'] = 'hidden';
     this.lightBtn.hidden = true;
     this.releaseBtn.hidden = true;
+    this.syncActions();
   }
 }

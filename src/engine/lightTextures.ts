@@ -71,3 +71,25 @@ export function streakTexture(width: number, height: number, hex: number, innerA
   cache.set(key, tex);
   return tex;
 }
+
+/** Soft horizontal wisp for drifting mist: a radial gradient stretched sideways. */
+export function wispTexture(width: number, height: number, hex: number, innerAlpha = 1): Texture {
+  const key = `w:${width}:${height}:${hex}:${innerAlpha}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const [canvas, ctx] = canvas2d(width, height);
+  const [r, g, b] = hexToRgb(hex);
+  ctx.save();
+  ctx.translate(width / 2, height / 2);
+  ctx.scale(width / height, 1);
+  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, height / 2);
+  grad.addColorStop(0, `rgba(${r},${g},${b},${innerAlpha})`);
+  grad.addColorStop(0.5, `rgba(${r},${g},${b},${innerAlpha * 0.35})`);
+  grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(-height / 2, -height / 2, height, height);
+  ctx.restore();
+  const tex = Texture.from(canvas);
+  cache.set(key, tex);
+  return tex;
+}

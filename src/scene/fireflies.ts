@@ -42,9 +42,9 @@ export class Fireflies {
     const count = motion === 'gentle' ? Math.ceil(FIREFLY_COUNT / 2) : FIREFLY_COUNT;
     const tex = radialGlowTexture(64, PALETTE.firefly, 0.8);
     for (let i = 0; i < count; i++) {
-      // Keep them off the dock and mostly near the reeds on both sides.
+      // Keep them clear of the lantern's spot and mostly near the reeds on both sides.
       const side = rng.next() < 0.5 ? -1 : 1;
-      const x = layout.dockX + side * (14 + rng.next() * (layout.width / 2 - 18));
+      const x = layout.centreX + side * (14 + rng.next() * (layout.width / 2 - 18));
       const y = layout.lakeEnd - 10 + rng.next() * 14;
       const halo = new Sprite(tex);
       halo.anchor.set(0.5);
@@ -74,7 +74,7 @@ export class Fireflies {
       f.y += f.vy * dt;
       if (f.y < this.layout.lakeEnd - 12) f.vy += 0.5 * dt;
       if (f.y > this.layout.height - 3) f.vy -= 0.5 * dt;
-      if (Math.abs(f.x - this.layout.dockX) < 12) f.vx += Math.sign(f.x - this.layout.dockX) * 0.8 * dt;
+      if (Math.abs(f.x - this.layout.centreX) < 12) f.vx += Math.sign(f.x - this.layout.centreX) * 0.8 * dt;
       f.x = Math.max(1, Math.min(this.layout.width - 2, f.x));
       const g = this.glow(f, tSec);
       f.halo.position.set(f.x * css, f.y * css);

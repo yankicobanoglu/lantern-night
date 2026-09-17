@@ -19,11 +19,9 @@ export type Layout = {
   lakeEnd: number;
   /** Moon centre in art px. */
   moon: { x: number; y: number };
-  /** Dock centre column in art px. */
-  dockX: number;
-  /** Dock length in art px (from the shoreline out over the water). */
-  dockLen: number;
-  /** Where an unlit lantern waits, in art px (centre of the 12×16 sprite), just above the far end of the dock. */
+  /** Composition centre column in art px (the lantern's spot on the shore). */
+  centreX: number;
+  /** Where an unlit lantern waits, in art px (centre of the 18×24 sprite), standing on the shore. */
   lanternRest: { x: number; y: number };
 };
 
@@ -47,8 +45,7 @@ export function computeLayout(cssWidth: number, cssHeight: number, dpr: number):
     ? { x: Math.round(width * 0.72), y: Math.round(height * 0.17) }
     : { x: Math.round(width * 0.74), y: Math.round(height * 0.16) };
 
-  const dockX = Math.floor(width / 2);
-  const dockLen = landscape ? 20 : 16;
+  const centreX = Math.floor(width / 2);
 
   return {
     cssWidth,
@@ -63,8 +60,7 @@ export function computeLayout(cssWidth: number, cssHeight: number, dpr: number):
     hillsEnd,
     lakeEnd,
     moon,
-    dockX,
-    dockLen,
-    lanternRest: { x: dockX, y: lakeEnd - dockLen - 12 },
+    centreX,
+    lanternRest: { x: centreX, y: lakeEnd - 11 },
   };
 }

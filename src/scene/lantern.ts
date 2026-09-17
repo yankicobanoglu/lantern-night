@@ -7,7 +7,7 @@ import { PALETTE } from '../palette';
 import { sizeStage, stepRise, type RiseOptions, type RiseState } from './lanternPhysics';
 import type { LanternTextures } from './lanternTextures';
 import type { SkyPoint } from './skyPoint';
-import { LANTERN_H, LANTERN_W, SMALL_H, SMALL_W } from './sprites/lantern';
+import { DOT, LANTERN_H, LANTERN_W, SMALL_H, SMALL_W } from './sprites/lantern';
 
 export type LanternPhase = 'unlit' | 'lit' | 'rising' | 'done';
 
@@ -150,7 +150,7 @@ export class Lantern {
   }
 
   private spriteSize(): { w: number; h: number } {
-    return this.stage === 'big' ? { w: LANTERN_W, h: LANTERN_H } : this.stage === 'small' ? { w: SMALL_W, h: SMALL_H } : { w: 2, h: 2 };
+    return this.stage === 'big' ? { w: LANTERN_W, h: LANTERN_H } : this.stage === 'small' ? { w: SMALL_W, h: SMALL_H } : { w: DOT, h: DOT };
   }
 
   private place(tSec: number): void {
@@ -170,28 +170,30 @@ export class Lantern {
     const cx = this.x * css;
     const cy = this.y * css;
 
-    // Halo: about 4.5 lantern widths at the dock, shrinking to a sky-light halo of ~8 art px.
-    const haloD = (LANTERN_W * 4.5 * (1 - p) + 8 * p) * css;
+    // Halo: about 4 lantern widths on the shore, shrinking to a sky-light halo of ~14 art px.
+    const haloD = (LANTERN_W * 4 * (1 - p) + 14 * p) * css;
     this.halo.position.set(cx, cy);
     this.halo.width = haloD;
     this.halo.height = haloD;
     this.halo.alpha = 0.55 * lit * flicker;
 
     const coreD = (w * 1.6 + 2) * css;
-    this.core.position.set(cx, cy + (this.stage === 'big' ? 3 * css : 0));
+    this.core.position.set(cx, cy + (this.stage === 'big' ? 4 * css : 0));
     this.core.width = coreD;
     this.core.height = coreD;
     this.core.alpha = 0.5 * lit * flicker;
 
-    // Reflection streak on the water: under the lantern over the dock, at the mirror point once above the shoreline.
+    // Reflection streak on the water: under the lantern once it is over the lake, at the mirror point once above the shoreline.
     const L = this.layout;
     const squash = L.hillsEnd / Math.max(1, L.lakeEnd - L.hillsEnd);
-    const waterY = Math.max(this.y + h * 0.5 + 2, L.hillsEnd + (L.hillsEnd - this.y) / squash);
+    const bottom = this.y + h * 0.5;
+    const waterY = Math.max(bottom + 2, L.hillsEnd + (L.hillsEnd - this.y) / squash);
+    const overWater = Math.max(0, Math.min(1, (L.lakeEnd - bottom) / 12));
     const wobble = Math.sin(tSec * 1.3 + this.swayPhase) * 1.2 * css;
     this.streak.position.set(cx + wobble, Math.min(waterY, L.lakeEnd - 1) * css);
-    this.streak.width = LANTERN_W * 2.4 * css * (1 - 0.5 * p);
-    this.streak.height = LANTERN_W * 5 * css * (1 - 0.6 * p);
-    this.streak.alpha = 0.4 * lit * Math.pow(1 - p, 1.5) * flicker;
+    this.streak.width = LANTERN_W * 2 * css * (1 - 0.5 * p);
+    this.streak.height = LANTERN_W * 4 * css * (1 - 0.6 * p);
+    this.streak.alpha = 0.4 * lit * overWater * Math.pow(1 - p, 1.5) * flicker;
   }
 
   destroy(): void {

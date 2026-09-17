@@ -6,7 +6,7 @@ const WARM: number[] = [PALETTE.lantern, PALETTE.lanternCore, PALETTE.ember, PAL
 
 async function restingRect(page: Page): Promise<number[]> {
   const { lanternRest: rest } = await getLayout(page);
-  return sampleRect(page, rest.x - 7, rest.y - 9, 14, 18);
+  return sampleRect(page, rest.x - 10, rest.y - 13, 20, 26);
 }
 
 function restCss(page: Page): Promise<{ x: number; y: number }> {
@@ -17,12 +17,12 @@ function restCss(page: Page): Promise<{ x: number; y: number }> {
 }
 
 test.describe('lanterns', () => {
-  test('an unlit lantern waits over the dock, in plum', async ({ page }, testInfo) => {
+  test('an unlit lantern waits on the shore, in plum', async ({ page }, testInfo) => {
     await openScene(page, 'date=2026-09-17');
     const hold = await page.evaluate(() => window.__lantern!.hold());
     expect(hold.state).toBe('idle');
     const px = await restingRect(page);
-    expect(px.filter((c) => c === PALETTE.plum).length).toBeGreaterThanOrEqual(40);
+    expect(px.filter((c) => c === PALETTE.plum).length).toBeGreaterThanOrEqual(150);
     expect(px.filter((c) => WARM.includes(c)).length).toBe(0);
     await expect(page.locator('#ui .hint')).toHaveText('Hold to light your lantern');
     await expect(page.getByRole('button', { name: 'Light it' })).toBeVisible();
@@ -63,7 +63,7 @@ test.describe('lanterns', () => {
     await expect(page.locator('#ui .hint')).toHaveText('Beautiful. Now breathe out, and let it rise.');
     await expect(page.getByRole('button', { name: 'Let it rise' })).toBeVisible();
     const lit = await restingRect(page);
-    expect(lit.filter((c) => c === PALETTE.lantern).length).toBeGreaterThanOrEqual(40);
+    expect(lit.filter((c) => c === PALETTE.lantern).length).toBeGreaterThanOrEqual(120);
     expect(lit.filter((c) => c === PALETTE.flame || c === PALETTE.lanternCore).length).toBeGreaterThanOrEqual(2);
     await page.waitForTimeout(300);
     await saveScreenshots(page, testInfo, 'lantern-lit');
@@ -83,7 +83,7 @@ test.describe('lanterns', () => {
     expect(mid.p).toBeLessThan(0.5);
     await saveScreenshots(page, testInfo, 'lantern-rising');
 
-    // A fresh lantern appears over the dock and the hint returns.
+    // A fresh lantern appears on the shore and the hint returns.
     await page.waitForFunction(() => window.__lantern!.lanterns().some((l) => l.phase === 'unlit'), undefined, { timeout: 3000 });
     await expect(page.locator('#ui .hint')).toHaveText('Hold to light your lantern');
 

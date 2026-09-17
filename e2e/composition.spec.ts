@@ -26,10 +26,11 @@ test('scene composition matches SPEC section 7', async ({ page }, testInfo) => {
   expect((l.lakeEnd - l.hillsEnd) / l.height).toBeCloseTo(0.2, 1);
   expect((l.height - l.lakeEnd) / l.height).toBeCloseTo(0.1, 1);
 
-  // Moon upper right, dock centred.
+  // Moon upper right, lantern spot centred.
   expect(l.moon.x / l.width).toBeGreaterThan(0.6);
   expect(l.moon.y / l.horizon).toBeLessThan(0.35);
-  expect(Math.abs(l.dockX - l.width / 2)).toBeLessThanOrEqual(1);
+  expect(Math.abs(l.centreX - l.width / 2)).toBeLessThanOrEqual(1);
+  expect(l.lanternRest.x).toBe(l.centreX);
 
   // Palette-exact samples: night at the top, a horizon-glow band above the far hills,
   // hills in hill colours, shore colour at the bottom edge.
@@ -41,8 +42,10 @@ test('scene composition matches SPEC section 7', async ({ page }, testInfo) => {
   expect([PALETTE.rose, PALETTE.blush, PALETTE.apricot, PALETTE.plum]).toContain(glow);
   expect([PALETTE.farHills, PALETTE.nearHills, PALETTE.shore]).toContain(await samplePixel(page, 3, l.horizon + 2));
   expect(await samplePixel(page, 3, l.height - 1)).toBe(PALETTE.shore);
-  // Dock wood at the centre of the shore/lake boundary.
-  expect([PALETTE.wood, PALETTE.woodDark]).toContain(await samplePixel(page, l.dockX, l.lakeEnd - 3));
+  // Ground at the centre of the shore (the lantern's spot) and a boat on the near water.
+  expect([PALETTE.shore, PALETTE.nearHills]).toContain(await samplePixel(page, l.centreX, l.lakeEnd + 3));
+  const nearWater = await sampleRect(page, 0, l.lakeEnd - 12, l.width, 8);
+  expect(nearWater.filter((c) => c === PALETTE.wood || c === PALETTE.woodDark).length).toBeGreaterThanOrEqual(20);
 
   // Lit cottage windows exist on the far hills.
   // Windows flicker between three warm colours, so count all of them.

@@ -51,7 +51,7 @@ describe('lantern sprite', () => {
         const b = /[pcr]/.test(unlit[y] ?? '');
         expect(a && b).toBe(false);
       }
-      const flame = mapColours(lit, LIT_PALETTE).has(PALETTE.flame) || (lit[15] ?? '').includes('y');
+      const flame = mapColours(lit, LIT_PALETTE).has(PALETTE.flame) || (lit[22] ?? '').includes('y');
       expect(flame).toBe(fill > 0);
     }
     expect(lanternMaps(0, 1).litRows).toBe(PAPER_ROWS);
@@ -84,6 +84,7 @@ describe('lantern sprite', () => {
       expect(colours.has(PALETTE.star)).toBe(false);
       for (const c of colours) expect([PALETTE.lantern, PALETTE.lanternCore, PALETTE.ember]).toContain(c);
     }
-    expect(skyLightMap('came-true').length).toBe(3);
+    expect(skyLightMap('came-true').length).toBe(5);
+    expect(skyLightMap('rising').length).toBe(4);
   });
 });

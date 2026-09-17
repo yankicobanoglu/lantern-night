@@ -44,7 +44,7 @@ export type LayoutInfo = {
   hillsEnd: number;
   lakeEnd: number;
   moon: { x: number; y: number };
-  dockX: number;
+  centreX: number;
   landscape: boolean;
   lanternRest: { x: number; y: number };
 };
@@ -61,7 +61,7 @@ export function getLayout(page: Page): Promise<LayoutInfo> {
       hillsEnd: l.hillsEnd,
       lakeEnd: l.lakeEnd,
       moon: l.moon,
-      dockX: l.dockX,
+      centreX: l.centreX,
       landscape: l.landscape,
       lanternRest: l.lanternRest,
     };

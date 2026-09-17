@@ -7,6 +7,20 @@
     <meta name="color-scheme" content="dark" />
     <title>Lantern Night</title>
     <style>
+      @font-face {
+        font-family: 'Nunito';
+        font-style: normal;
+        font-weight: 400 600;
+        font-display: swap;
+        src: url('fonts/nunito-latin.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Pixelify Sans';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('fonts/pixelify-sans-latin.woff') format('woff');
+      }
       :root {
         --night: #1b1b3a;
         --apricot: #e8a07a;
@@ -49,45 +63,56 @@
       #ui[data-state='hidden'] { visibility: hidden; }
       .breath {
         position: absolute;
-        width: 44px;
-        height: 44px;
-        margin: -22px 0 0 -22px;
+        width: 60px;
+        height: 60px;
+        margin: -30px 0 0 -30px;
         border-radius: 50%;
         border: 2px solid rgba(232, 160, 122, 0.55);
         box-shadow: 0 0 24px rgba(255, 181, 71, 0.25);
         opacity: 0;
         transform: scale(1);
         transition-property: transform, opacity;
-        transition-timing-function: cubic-bezier(0.33, 0.0, 0.2, 1);
+        transition-timing-function: cubic-bezier(0.33, 0, 0.2, 1);
         transition-duration: 4000ms;
       }
       #ui[data-state='idle'] .breath { opacity: 0.45; transition-duration: 700ms; }
-      .breath.holding { opacity: 0.9; transform: scale(5); }
-      .breath.done { opacity: 0; transform: scale(5.6); transition-duration: 900ms; }
-      #ui.gentle .breath.holding { transform: scale(2.2); }
-      .hint {
+      .breath.holding { opacity: 0.9; transform: scale(4.2); }
+      .breath.done { opacity: 0; transform: scale(4.8); transition-duration: 900ms; }
+      #ui.gentle .breath.holding { transform: scale(2); }
+      /* One translucent night panel above the lantern (SPEC section 7, UI surfaces). */
+      .panel {
         position: absolute;
-        left: 16px;
-        right: 16px;
-        bottom: calc(100% - var(--lantern-y, 70%) + 34px);
-        margin: 0;
+        left: 50%;
+        bottom: calc(100% - var(--lantern-y) + 44px);
+        transform: translateX(-50%);
+        width: min(340px, calc(100% - 32px));
+        box-sizing: border-box;
+        padding: 14px 18px 12px;
+        border-radius: 12px;
+        background: rgba(27, 27, 58, 0.72);
+        border: 1px solid rgba(232, 160, 122, 0.2);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
         text-align: center;
+        transition: opacity 500ms ease;
+      }
+      .hint {
+        margin: 0;
+        min-height: 1.4em;
         font-size: 17px;
         font-weight: 600;
         line-height: 1.4;
-        text-shadow: 0 1px 12px rgba(27, 27, 58, 0.9), 0 0 2px rgba(27, 27, 58, 1);
-        transition: opacity 500ms ease;
+        letter-spacing: 0.01em;
+        transition: opacity 260ms ease;
       }
+      .hint.fading { opacity: 0; }
       .actions {
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: calc(40px + var(--safe-bottom));
         display: flex;
         justify-content: center;
         gap: 12px;
-        pointer-events: none;
+        margin-top: 10px;
       }
+      .actions:empty, .actions[data-empty='true'] { display: none; }
       .btn {
         pointer-events: auto;
         min-height: 44px;
@@ -107,9 +132,9 @@
         border: 1px solid rgba(232, 160, 122, 0.2);
       }
       .btn.ghost {
-        background: rgba(27, 27, 58, 0.72);
+        background: transparent;
         color: var(--cream);
-        border: 1px solid rgba(232, 160, 122, 0.2);
+        border: 1px solid rgba(232, 160, 122, 0.35);
       }
       .btn:focus-visible {
         outline: 2px solid var(--cream);
@@ -121,7 +146,7 @@
     </style>
   </head>
   <body>
-    <canvas id="world" aria-label="A quiet lake at dusk. Hills with two lit cottages, pine trees, a wooden dock, and the moon in the upper right sky. A paper lantern waits over the dock; released lanterns rise and settle among the stars."></canvas>
+    <canvas id="world" aria-label="A quiet lake at dusk. Hills with two lit cottages and chimney smoke, pine trees, a rowing boat on the water, mist, and the moon in the upper right sky. A paper lantern waits on the grassy shore; released lanterns rise and settle among the stars."></canvas>
     <div id="ui" data-state="hidden"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

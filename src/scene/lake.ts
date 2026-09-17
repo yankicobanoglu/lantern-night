@@ -50,8 +50,8 @@ export class Lake {
       const tex = new Texture({ source: aboveRT.source, frame: new Rectangle(0, srcY, width, 1) });
       const sprite = new Sprite(tex);
       sprite.position.set(0, hillsEnd + r);
-      sprite.tint = 0x999999; // about 40% darker
-      sprite.alpha = 0.82; // let the lake colour show through
+      sprite.tint = 0x8c8c8c; // about 45% darker
+      sprite.alpha = 0.78; // let the lake colour show through
       this.rows.push(sprite);
       this.rowTextures.push(tex);
       this.container.addChild(sprite);

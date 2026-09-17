@@ -28,11 +28,14 @@ describe('computeLayout', () => {
     expect(l.lakeEnd).toBe(288);
   });
 
-  it('keeps the moon in the upper right and the dock centred', () => {
+  it('keeps the moon in the upper right and the lantern spot centred on the shore', () => {
     for (const l of [computeLayout(390, 844, 3), computeLayout(1280, 800, 2)]) {
       expect(l.moon.x).toBeGreaterThan(l.width * 0.6);
       expect(l.moon.y + 16).toBeLessThan(l.horizon * 0.6);
-      expect(Math.abs(l.dockX - l.width / 2)).toBeLessThanOrEqual(1);
+      expect(Math.abs(l.centreX - l.width / 2)).toBeLessThanOrEqual(1);
+      expect(l.lanternRest.x).toBe(l.centreX);
+      expect(l.lanternRest.y).toBeLessThan(l.lakeEnd);
+      expect(l.lanternRest.y + 12).toBeGreaterThan(l.lakeEnd);
     }
   });
 

@@ -1,6 +1,7 @@
 import { Texture } from 'pixi.js';
 import { PixelBuffer } from '../engine/pixelBuffer';
 import {
+  DOT,
   FRAMES,
   LANTERN_H,
   LANTERN_W,
@@ -40,7 +41,7 @@ export class LanternTextures {
       this.small.push(buf.toTexture());
     }
     for (let f = 0; f < 2; f++) {
-      const buf = new PixelBuffer(2, 2);
+      const buf = new PixelBuffer(DOT, DOT);
       buf.blit(skyLightMap('rising', f), SKY_LIGHT_PALETTE, 0, 0);
       this.dot.push(buf.toTexture());
     }

@@ -59,7 +59,7 @@ export class SkyLights {
 
   private art(i: number): { x: number; y: number; size: number } {
     const l = this.lights[i]!;
-    const size = l.status === 'came-true' ? 3 : 2;
+    const size = l.status === 'came-true' ? 5 : 4;
     return { x: Math.round(l.sky.x * this.layout.width - size / 2), y: Math.round(l.sky.y * this.layout.horizon - size / 2), size };
   }
 
@@ -69,12 +69,12 @@ export class SkyLights {
     if (!p || !l) return;
     const css = this.layout.cssScale;
     const { x, y, size } = this.art(i);
-    const d = (size === 3 ? 12 : 9) * css;
+    const d = (size === 5 ? 18 : 14) * css;
     p.scaleX = d / 64;
     p.scaleY = d / 64;
     p.x = (x + size / 2) * css;
     p.y = (y + size / 2 + this.bob(i, tSec)) * css;
-    p.alpha = l.status === 'let-go' ? 0.25 : l.status === 'came-true' ? 0.75 : 0.5;
+    p.alpha = l.status === 'let-go' ? 0.3 : l.status === 'came-true' ? 0.9 : 0.7;
   }
 
   /** Per frame: halos follow the (float) bob. */

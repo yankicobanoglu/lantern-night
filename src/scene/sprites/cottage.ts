@@ -10,8 +10,8 @@ export const COTTAGE_A: PixelMap = [
   '...rrrrrrr.',
   '..rrrrrrrr.',
   '.rrrrrrrrrr',
-  '.bbbwwwbbbb',
-  '.bbbwwwbbbb',
+  '.bbwwbbbwwb',
+  '.bbwwbbbwwb',
   '.bbbbbbbbbb',
 ];
 
@@ -20,13 +20,24 @@ export const COTTAGE_B: PixelMap = [
   '.rrrrrrrrrrr.',
   'rrrrrrrrrrrrr',
   '.bbbbbbbbbbb.',
-  '.bbbbbbwwwbb.',
-  '.bbbbbbwwwbb.',
+  '.bbwwbbbbwwb.',
+  '.bbwwbbbbwwb.',
   '.bbbbbbbbbbb.',
 ];
 
-/** Window rectangle within each map, for the flicker overlay. */
-export const COTTAGE_WINDOWS = {
-  a: { x: 4, y: 5, w: 3, h: 2 },
-  b: { x: 7, y: 4, w: 3, h: 2 },
-} as const;
+export type Rect = { x: number; y: number; w: number; h: number };
+
+/** Window rectangles within each map, for the flicker overlay and the warm glow. */
+export const COTTAGE_WINDOWS: Record<'a' | 'b', readonly Rect[]> = {
+  a: [
+    { x: 3, y: 5, w: 2, h: 2 },
+    { x: 8, y: 5, w: 2, h: 2 },
+  ],
+  b: [
+    { x: 3, y: 4, w: 2, h: 2 },
+    { x: 9, y: 4, w: 2, h: 2 },
+  ],
+};
+
+/** Chimney top (the pixel above which smoke starts) within each map. */
+export const COTTAGE_CHIMNEYS = { a: { x: 8, y: 0 }, b: { x: 2, y: 0 } } as const;
