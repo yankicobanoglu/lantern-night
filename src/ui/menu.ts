@@ -8,7 +8,7 @@ export class Menu {
   readonly sheet: HTMLElement;
   private open = false;
 
-  constructor(root: HTMLElement, handlers: { onSky: () => void; onSettings: () => void }) {
+  constructor(root: HTMLElement, handlers: { onSky: () => void; onSettings: () => void; onShare: () => void }) {
     this.button = el('button', { type: 'button', class: 'corner', 'aria-label': COPY.menu.open, 'aria-expanded': 'false' }, [el('i')]);
     this.sheet = el('div', { class: 'menu-sheet panel', role: 'menu' }, [
       button(COPY.menu.sky, 'ghost small', () => {
@@ -18,6 +18,10 @@ export class Menu {
       button(COPY.menu.settings, 'ghost small', () => {
         this.toggle(false);
         handlers.onSettings();
+      }, { role: 'menuitem' }),
+      button(COPY.share.button, 'ghost small', () => {
+        this.toggle(false);
+        handlers.onShare();
       }, { role: 'menuitem' }),
     ]);
     this.button.addEventListener('click', () => this.toggle());

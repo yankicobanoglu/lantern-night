@@ -65,9 +65,13 @@ async function boot(): Promise<void> {
   if (opts.showFps) mountFpsOverlay(stats, cpu);
 
   let resizeTimer = 0;
+  let appliedW = window.innerWidth;
+  let appliedH = window.innerHeight;
   const onResize = (): void => {
     window.clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => {
+      appliedW = window.innerWidth;
+      appliedH = window.innerHeight;
       app.renderer.resize(window.innerWidth, window.innerHeight);
       layout = computeLayout(window.innerWidth, window.innerHeight, app.renderer.resolution);
       scene.resize(layout, session.motion());
@@ -76,9 +80,13 @@ async function boot(): Promise<void> {
     }, 80);
   };
   window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', onResize);
+  window.visualViewport?.addEventListener('resize', onResize);
 
   app.ticker.add(
     (ticker) => {
+      // A home-screen web app on iOS can report the wrong height at launch without a resize event: check every frame.
+      if (window.innerWidth !== appliedW || window.innerHeight !== appliedH) onResize();
       stats.push(ticker.deltaMS);
       const t0 = performance.now();
       scene.update(ticker.deltaMS);

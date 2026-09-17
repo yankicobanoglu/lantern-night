@@ -7,7 +7,7 @@ export type ShareOutcome = 'shared' | 'downloaded' | 'cancelled';
 export async function shareOrDownload(blob: Blob, name: string, title: string): Promise<ShareOutcome> {
   const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
   if (typeof File !== 'undefined' && nav.canShare && nav.share) {
-    const file = new File([blob], name, { type: blob.type });
+    const file = blob instanceof File ? blob : new File([blob], name, { type: blob.type });
     if (nav.canShare({ files: [file] })) {
       try {
         await nav.share({ files: [file], title });

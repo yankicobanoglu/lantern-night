@@ -5,8 +5,13 @@ import { focusFirst } from './focus';
 export type ShareSheetHandlers = {
   /** Compose the image; resolves to the canvas to preview. */
   render: (includeWish: boolean) => Promise<HTMLCanvasElement>;
-  /** Share (or download) the canvas last rendered. */
-  share: (canvas: HTMLCanvasElement) => Promise<void>;
+  /** Turn the rendered canvas into the file to share. */
+  toFile: (canvas: HTMLCanvasElement) => Promise<File>;
+  /**
+   * Share (or download) the prepared file. Called synchronously from the tap:
+   * iOS only opens its share sheet inside the user gesture.
+   */
+  share: (file: File) => void;
   onClose: () => void;
 };
 
@@ -20,7 +25,7 @@ export class ShareSheet {
   private readonly toggle: HTMLButtonElement;
   private readonly toggleRow: HTMLElement;
   private readonly shareBtn: HTMLButtonElement;
-  private canvas: HTMLCanvasElement | null = null;
+  private file: File | null = null;
   private wish: string | null = null;
   private renderId = 0;
 
@@ -33,7 +38,7 @@ export class ShareSheet {
       void this.refresh();
     });
     this.toggleRow = el('div', { class: 'setting' }, [el('span', { class: 'label', text: COPY.share.includeWish }), this.toggle]);
-    this.shareBtn = button(COPY.share.button, 'primary small', () => void this.doShare(), { 'data-action': 'share' });
+    this.shareBtn = button(COPY.share.button, 'primary small', () => this.doShare(), { 'data-action': 'share' });
     this.node = el('section', { class: 'overlay share', 'aria-label': COPY.share.button, role: 'dialog' }, [
       el('div', { class: 'sheet panel' }, [
         el('h2', { text: COPY.share.button }),
@@ -56,8 +61,10 @@ export class ShareSheet {
     try {
       const canvas = await this.handlers.render(this.includeWish);
       if (id !== this.renderId) return;
-      this.canvas = canvas;
       this.preview.src = canvas.toDataURL('image/png');
+      const file = await this.handlers.toFile(canvas);
+      if (id !== this.renderId) return;
+      this.file = file;
     } finally {
       if (id === this.renderId) {
         this.shareBtn.disabled = false;
@@ -66,14 +73,9 @@ export class ShareSheet {
     }
   }
 
-  private async doShare(): Promise<void> {
-    if (!this.canvas) return;
-    this.shareBtn.disabled = true;
-    try {
-      await this.handlers.share(this.canvas);
-    } finally {
-      this.shareBtn.disabled = false;
-    }
+  private doShare(): void {
+    if (!this.file) return;
+    this.handlers.share(this.file);
   }
 
   /** Open with the wish that may be included (null: the toggle is not offered). */
@@ -82,7 +84,7 @@ export class ShareSheet {
     this.toggle.setAttribute('aria-checked', 'false');
     this.toggleRow.hidden = wish === null;
     this.preview.removeAttribute('src');
-    this.canvas = null;
+    this.file = null;
     this.node.classList.add('on');
     void this.refresh();
     focusFirst(this.node);
@@ -95,6 +97,6 @@ export class ShareSheet {
   hide(): void {
     this.node.classList.remove('on');
     this.renderId++;
-    this.canvas = null;
+    this.file = null;
   }
 }

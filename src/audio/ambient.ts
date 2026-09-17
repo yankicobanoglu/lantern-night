@@ -68,7 +68,7 @@ export class Ambient {
     lp.frequency.value = 320;
     lp.Q.value = 0.6;
     const windGain = ctx.createGain();
-    windGain.gain.value = 0.42;
+    windGain.gain.value = 0.3;
     const lfoF = ctx.createOscillator();
     lfoF.frequency.value = 0.043;
     const lfoFGain = ctx.createGain();
@@ -77,7 +77,7 @@ export class Ambient {
     const lfoA = ctx.createOscillator();
     lfoA.frequency.value = 0.097;
     const lfoAGain = ctx.createGain();
-    lfoAGain.gain.value = 0.16;
+    lfoAGain.gain.value = 0.11;
     lfoA.connect(lfoAGain).connect(windGain.gain);
     wind.connect(lp).connect(windGain).connect(this.out);
     wind.start(t0);

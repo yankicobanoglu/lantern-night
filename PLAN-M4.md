@@ -80,3 +80,14 @@ e2e/access.spec.ts                keyboard-only, reduced motion, audio starts af
   - The goodnight veil is a focusable control labelled "Back to the start" so the ritual can end from the keyboard.
   - The install hint panel has a Close button (the deck has no dismiss line); the iOS line also goes on its own after 16 s.
 - Not verifiable headless, for the iPhone check: how the soundscape actually sounds (levels are at −18 dB master, wind 0.42, crickets 0.045, water ~0.13, whoosh up to 0.55, chime 0.42, shimmer 0.16 before the master), the real share sheet, Add to Home Screen, airplane mode, and whether persist() is granted after installing.
+
+## Review fixes after the iPhone check (2026-09-17)
+
+- Share opened a viewer instead of the iOS share sheet: iOS only opens its sheet inside the tap, and the image was still being turned into a file after the tap. The file is now prepared when the preview renders, and the tap calls the share API synchronously.
+- "Share my sky" is now also a corner-menu item, reachable at any time (it was only in Your sky and the watch state).
+- Wind level lowered (0.42 → 0.30, gust depth 0.16 → 0.11).
+- Home-screen icon redrawn: a 32×32 dusk scene with a glowing lantern over the lake and the moon; the render extends the edge rows so no frame shows at 180/192/512.
+- Empty band at the bottom in a home-screen web app: iOS reports the wrong height at launch and fires no resize event, so the canvas kept that height. The ticker now checks the viewport size every frame and resizes when it changes.
+- "Back to the start" is not a visible control: it is the label of the dimmed goodnight veil for keyboard and screen-reader users.
+- Sky lost after Add to Home Screen: an iOS home-screen web app has its own storage, separate from Safari, so nothing carries over. Save a backup in Safari and Restore from backup in the app is the intended path (section 6). The install hint did not show on the test phone because it only shows on the 1st and 3rd visit and that device already had many visits; `?install=ios` forces it.
+- Copy proposal: the iOS install line implies the sky carries over. Suggested: "Keep Lantern Night on your home screen so your sky stays safe: save a backup, tap Share, then Add to Home Screen, and restore it there."

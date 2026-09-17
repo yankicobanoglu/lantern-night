@@ -151,7 +151,8 @@ export class Session {
     });
     this.share = new ShareSheet(root, {
       render: (includeWish) => this.renderShare(includeWish ? this.shareWish : null),
-      share: (canvas) => this.shareCanvas(canvas),
+      toFile: async (canvas) => new File([await canvasToBlob(canvas)], shareFileName(this.deps.now()), { type: 'image/png' }),
+      share: (file) => void shareOrDownload(file, file.name, COPY.title),
       onClose: () => this.closeShare(),
     });
     this.menu = new Menu(root, {
@@ -167,6 +168,7 @@ export class Session {
         this.settings.show(this.deps.store.settings, this.motion());
         root.classList.add('overlay-open');
       },
+      onShare: () => this.openShare(null),
     });
     this.mute = new MuteButton(root, (on) => void this.changeSettings({ sound: on }));
     this.moon = new MoonLabel(root, deps.now);
@@ -392,11 +394,11 @@ export class Session {
   }
 
   private shareWish: string | null = null;
-  private shareReturnTo: 'sky' | 'stage' = 'stage';
+  private shareReturnTo: 'sky' | 'stage' | 'menu' = 'stage';
 
   private openShare(wish: string | null): void {
     this.shareWish = wish;
-    this.shareReturnTo = this.skyView.isOpen ? 'sky' : 'stage';
+    this.shareReturnTo = this.skyView.isOpen ? 'sky' : this.machine.state === 'watch' ? 'stage' : 'menu';
     this.skyView.hide();
     this.settings.hide();
     this.deps.root.classList.add('overlay-open');
@@ -409,7 +411,7 @@ export class Session {
       this.skyView.show(this.deps.store.lanterns, this.deps.layout());
     } else {
       this.deps.root.classList.remove('overlay-open');
-      focusNode(this.deps.root.querySelector<HTMLElement>('.stage .btn[data-action="share"]'));
+      focusNode(this.shareReturnTo === 'stage' ? this.deps.root.querySelector<HTMLElement>('.stage .btn[data-action="share"]') : this.menu.button);
     }
   }
 
@@ -424,11 +426,6 @@ export class Session {
       rising: scene.lanterns.rising.map((l) => l.rise.p),
       wish,
     });
-  }
-
-  private async shareCanvas(canvas: HTMLCanvasElement): Promise<void> {
-    const blob = await canvasToBlob(canvas);
-    await shareOrDownload(blob, shareFileName(this.deps.now()), COPY.title);
   }
 
   private followLantern(): void {
