@@ -28,8 +28,17 @@ export class HoldController {
     window.addEventListener('pointermove', this.onMove);
     window.addEventListener('pointerup', this.onUp);
     window.addEventListener('pointercancel', this.onUp);
-    // A swipe must never scroll the page (SPEC section 11 checklist).
-    document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+    // A swipe must never scroll the page (SPEC section 11 checklist). Scrollable
+    // sheets (chips, settings) opt out with `touch-action: pan-*` in CSS.
+    document.addEventListener(
+      'touchmove',
+      (e) => {
+        const t = e.target;
+        if (t instanceof Element && t.closest('.chips, .sheet, .screen .panel')) return;
+        e.preventDefault();
+      },
+      { passive: false },
+    );
   }
 
   /** A lantern is waiting: accept input. */

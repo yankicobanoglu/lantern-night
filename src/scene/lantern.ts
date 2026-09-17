@@ -34,6 +34,10 @@ export class Lantern {
   x: number;
   y: number;
   sky: SkyPoint | null = null;
+  /** Id of the stored record (wish lanterns only). */
+  storedId: string | null = null;
+  /** The written text while the lantern is on the shore; cleared on release. */
+  wishText: string | null = null;
   readonly rise: RiseState;
   private frame = 0;
   private flickerAcc = 0;

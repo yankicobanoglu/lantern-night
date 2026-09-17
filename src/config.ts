@@ -43,3 +43,26 @@ export const NEXT_LANTERN_MIN_PROGRESS = 0.85;
 
 /** Fireflies along the shore; halved under reduced motion. */
 export const FIREFLY_COUNT = 14;
+
+/**
+ * Watch state: the Light another / Goodnight buttons fade in once the released
+ * lantern has passed this fraction of the sky band, or reached this rise
+ * progress (review note after M2b; SPEC section 3 says ~6 s, kept as a fallback ceiling).
+ */
+export const WATCH_BUTTONS_SKY_FRACTION = NEXT_LANTERN_SKY_FRACTION;
+export const WATCH_BUTTONS_MIN_PROGRESS = NEXT_LANTERN_MIN_PROGRESS;
+/** The written text follows the rising lantern and fades over this long. */
+export const WISH_FADE_MS = 3000;
+
+/** Shooting stars (SPEC section 7, Legibility). */
+export const STAR_INTERVAL_MIN_S = 45;
+export const STAR_INTERVAL_MAX_S = 120;
+export const STAR_FIRST_SESSION_MAX_S = 60;
+export const STAR_TWINKLE_S = 0.3;
+export const STAR_CROSS_S = 1.4;
+export const STAR_FADE_S = 0.6;
+export const STAR_LINGER_S = 0.6;
+export const STAR_HEAD_PX = 9;
+export const STAR_TRAIL_PX = 80;
+export const STAR_HIT_PX = 64;
+export const STAR_CROSS_FRACTION = 0.4;

@@ -93,3 +93,31 @@ export function wispTexture(width: number, height: number, hex: number, innerAlp
   cache.set(key, tex);
   return tex;
 }
+
+/**
+ * Tapered trail for a shooting star: bright and thick at the right (head) end,
+ * fading and narrowing to nothing at the left. Anchor it at (1, 0.5).
+ */
+export function trailTexture(length: number, thickness: number, hex: number): Texture {
+  const key = `t:${length}:${thickness}:${hex}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const [canvas, ctx] = canvas2d(length, thickness);
+  const [r, g, b] = hexToRgb(hex);
+  const cy = thickness / 2;
+  ctx.beginPath();
+  ctx.moveTo(0, cy);
+  ctx.quadraticCurveTo(length * 0.6, 0, length, 0);
+  ctx.lineTo(length, thickness);
+  ctx.quadraticCurveTo(length * 0.6, thickness, 0, cy);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, 0, length, 0);
+  grad.addColorStop(0, `rgba(${r},${g},${b},0)`);
+  grad.addColorStop(0.5, `rgba(${r},${g},${b},0.35)`);
+  grad.addColorStop(1, `rgba(${r},${g},${b},0.95)`);
+  ctx.fillStyle = grad;
+  ctx.fill();
+  const tex = Texture.from(canvas);
+  cache.set(key, tex);
+  return tex;
+}

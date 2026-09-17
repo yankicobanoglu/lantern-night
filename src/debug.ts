@@ -1,9 +1,11 @@
 import type { Application } from 'pixi.js';
 import type { Layout } from './engine/layout';
 import type { FrameStats } from './engine/ticker';
-import type { HoldController } from './ritual/hold';
+import type { Session } from './ritual/session';
 import { moonAge, moonFrame, type MoonFrame } from './ritual/moonPhase';
 import type { Scene } from './scene/scene';
+import type { Store } from './store/store';
+import type { Lantern, Settings } from './store/types';
 
 export type DebugOptions = {
   /** Fixed clock (from ?date=YYYY-MM-DD), else the real clock. */
@@ -18,6 +20,8 @@ export type DebugOptions = {
   skyLights: number;
   /** ?motion=gentle|full overrides the system setting. */
   motion: 'gentle' | 'full' | null;
+  /** ?star=now: a shooting star right away. */
+  starNow: boolean;
 };
 
 export function readDebugOptions(search: string): DebugOptions {
@@ -37,6 +41,7 @@ export function readDebugOptions(search: string): DebugOptions {
     risingLanterns: count('lanterns', 12),
     skyLights: count('sky', 1000),
     motion: motion === 'gentle' || motion === 'full' ? motion : null,
+    starNow: params.get('star') === 'now',
   };
 }
 
@@ -64,6 +69,13 @@ export type LanternDebug = {
   release: () => void;
   /** Time multiplier for the scene (not for input). */
   speed: (x: number) => void;
+  /** Ritual state. */
+  state: () => string;
+  /** Stored lanterns and settings; seed() replaces the stored lanterns (tests). */
+  store: { lanterns: () => Lantern[]; settings: () => Settings; seed: (lanterns: Lantern[]) => Promise<void>; available: () => boolean };
+  /** Shooting star head in CSS px while tappable, else null; spawn one now. */
+  star: () => { x: number; y: number } | null;
+  spawnStar: () => boolean;
   /** The live scene, for manual inspection in dev. */
   scene: Scene;
   ready: boolean;
@@ -78,7 +90,8 @@ declare global {
 export function installDebug(
   app: Application,
   scene: Scene,
-  hold: HoldController,
+  session: Session,
+  store: Store,
   stats: FrameStats,
   cpu: FrameStats,
   getLayout: () => Layout,
@@ -117,12 +130,21 @@ export function installDebug(
     },
     lanterns: () => scene.lanterns.lanterns.map((l) => ({ phase: l.phase, fill: l.fill, x: l.x, y: l.y, p: l.rise.p })),
     skyLights: () => scene.skyLights.lights.length,
-    hold: () => ({ state: hold.state, fill: hold.fill }),
-    light: () => hold.lightNow(),
-    release: () => hold.releaseNow(),
+    hold: () => ({ state: session.hold.state, fill: session.hold.fill }),
+    light: () => session.hold.lightNow(),
+    release: () => session.hold.releaseNow(),
     speed: (x) => {
       scene.speed = x;
     },
+    state: () => session.machine.state,
+    store: {
+      lanterns: () => store.lanterns,
+      settings: () => store.settings,
+      seed: (lanterns) => store.replaceAll(lanterns),
+      available: () => store.available,
+    },
+    star: () => session.star(),
+    spawnStar: () => session.spawnStarNow(),
     scene,
     ready: false,
   };

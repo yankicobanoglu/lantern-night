@@ -8,7 +8,7 @@ import { PALETTE } from '../palette';
 import type { SkyPoint } from './skyPoint';
 import { SKY_LIGHT_PALETTE, skyLightMap, type SkyStatus } from './sprites/lantern';
 
-export type SkyLight = { seed: number; sky: SkyPoint; status: SkyStatus };
+export type SkyLight = { seed: number; sky: SkyPoint; status: SkyStatus; id?: string };
 
 /**
  * Past lanterns as small warm lights (SPEC section 7 "Stars vs past lanterns"):
@@ -49,6 +49,22 @@ export class SkyLights {
     this.particles.push(p);
     this.halos.addParticle(p);
     this.placeHalo(this.lights.length - 1, 0);
+    this.drawTick(this.lastTick);
+  }
+
+  /** A return changed a stored lantern's status: brighter and larger when it came true, dimmer when let go. */
+  setStatus(id: string, status: SkyStatus): void {
+    const i = this.lights.findIndex((l) => l.id === id);
+    if (i < 0) return;
+    this.lights[i]!.status = status;
+    this.placeHalo(i, 0);
+    this.drawTick(this.lastTick);
+  }
+
+  clear(): void {
+    for (const p of this.particles) this.halos.removeParticle(p);
+    this.particles = [];
+    this.lights.length = 0;
     this.drawTick(this.lastTick);
   }
 

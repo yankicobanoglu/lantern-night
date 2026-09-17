@@ -1,0 +1,845 @@
+/* Lantern Night overlay styles (SPEC section 7: surfaces, typography, motion). */
+
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/fonts/nunito-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Patrick Hand';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/patrick-hand-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Pixelify Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/pixelify-sans-latin.woff') format('woff');
+}
+
+:root {
+  --night: #1b1b3a;
+  --apricot: #e8a07a;
+  --glow: #ffb547;
+  --cream: #fff4d6;
+  --ink: #2a1a0a;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --lantern-x: 50%;
+  --lantern-y: 70%;
+  --text-scale: 1;
+  --hand: 'Patrick Hand', 'Nunito', system-ui, sans-serif;
+  --body: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --pixel: 'Pixelify Sans', 'Nunito', system-ui, sans-serif;
+  --ease: cubic-bezier(0.33, 0, 0.2, 1);
+  --panel: rgba(27, 27, 58, 0.72);
+  --panel-border: rgba(232, 160, 122, 0.2);
+  font-size: calc(16px * var(--text-scale));
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--night);
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  font-family: var(--body);
+  color: var(--cream);
+}
+#world {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  image-rendering: pixelated;
+}
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  touch-action: none;
+  z-index: 2;
+}
+#ui[data-state='loading'] > * {
+  visibility: hidden;
+}
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* ---------- Surfaces ---------- */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-sizing: border-box;
+}
+.btn {
+  pointer-events: auto;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 6px 18px;
+  border-radius: 999px;
+  font-family: var(--hand);
+  font-size: 1.2rem;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    opacity 400ms ease,
+    transform 400ms ease,
+    background-color 300ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn[hidden] {
+  display: none;
+}
+.btn.primary {
+  background: var(--glow);
+  color: var(--ink);
+  border: 1px solid rgba(232, 160, 122, 0.2);
+}
+.btn.primary:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.btn.ghost {
+  background: rgba(27, 27, 58, 0.55);
+  color: var(--cream);
+  border: 1px solid rgba(232, 160, 122, 0.3);
+}
+.btn.ghost[aria-pressed='true'] {
+  background: rgba(255, 181, 71, 0.22);
+  border-color: rgba(255, 181, 71, 0.6);
+}
+.btn.small {
+  min-height: 40px;
+  font-size: 1.15rem;
+}
+.btn:focus-visible,
+.switch:focus-visible,
+.chip:focus-visible,
+.corner:focus-visible,
+.sky-light:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--cream);
+  outline-offset: 2px;
+}
+.line {
+  margin: 0;
+  font-family: var(--body);
+  font-size: 1.05rem;
+  line-height: 1.45;
+}
+.hand {
+  font-family: var(--hand);
+}
+.muted {
+  opacity: 0.8;
+}
+
+/* ---------- Screens (bottom third) ---------- */
+.screen {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(20px + var(--safe-bottom));
+  max-height: 72%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 600ms var(--ease),
+    transform 600ms var(--ease),
+    visibility 0s linear 600ms;
+  visibility: hidden;
+}
+.screen.on {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition-delay: 0s;
+}
+.screen:not(.on),
+.screen:not(.on) *,
+.overlay:not(.on),
+.overlay:not(.on) * {
+  pointer-events: none !important;
+}
+.screen .panel {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+  touch-action: pan-y;
+}
+@media (min-width: 700px) {
+  .screen {
+    left: 50%;
+    right: auto;
+    width: 440px;
+    transform: translate(-50%, 8px);
+  }
+  .screen.on {
+    transform: translate(-50%, 0);
+  }
+}
+.row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.row.spread {
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Title over the sky. */
+.title {
+  position: absolute;
+  top: calc(2.5% + var(--safe-top));
+  left: 0;
+  right: 0;
+  margin: 0;
+  text-align: center;
+  font-family: var(--pixel);
+  font-weight: 400;
+  font-size: 2.2rem;
+  letter-spacing: 0.02em;
+  color: var(--cream);
+  text-shadow:
+    0 2px 12px rgba(27, 27, 58, 0.9),
+    0 0 24px rgba(255, 181, 71, 0.25);
+  opacity: 0;
+  transition: opacity 900ms var(--ease);
+}
+.title.on {
+  opacity: 1;
+}
+.banner {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255, 181, 71, 0.12);
+  border: 1px solid rgba(255, 181, 71, 0.25);
+  font-family: var(--hand);
+  font-size: 1.15rem;
+  line-height: 1.3;
+}
+.banner[hidden] {
+  display: none;
+}
+
+/* Intention */
+.heading {
+  margin: 0;
+  font-family: var(--hand);
+  font-weight: 400;
+  font-size: 1.45rem;
+  line-height: 1.25;
+}
+.field {
+  pointer-events: auto;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 72px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(232, 160, 122, 0.3);
+  background: rgba(27, 27, 58, 0.6);
+  color: var(--cream);
+  font-family: var(--hand);
+  font-size: 1.25rem;
+  line-height: 1.3;
+  resize: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.field::placeholder {
+  color: rgba(255, 244, 214, 0.5);
+}
+.counter {
+  font-size: 0.85rem;
+  opacity: 0.7;
+  text-align: right;
+  margin: -6px 0 0;
+}
+.chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 6px;
+  margin: 0 -2px;
+  touch-action: pan-x;
+  scrollbar-width: none;
+}
+.chips::-webkit-scrollbar {
+  display: none;
+}
+.chip {
+  pointer-events: auto;
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 160, 122, 0.3);
+  background: rgba(255, 181, 71, 0.1);
+  color: var(--cream);
+  font-family: var(--hand);
+  font-size: 1.05rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Return card */
+.quote {
+  margin: 0;
+  font-family: var(--hand);
+  font-size: 1.3rem;
+  line-height: 1.3;
+  color: var(--glow);
+}
+
+/* ---------- Light / watch stage ---------- */
+.stage {
+  position: absolute;
+  inset: 0;
+}
+.stage[data-state='hidden'] {
+  visibility: hidden;
+}
+.breath {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  margin: -30px 0 0 -30px;
+  border-radius: 50%;
+  border: 2px solid rgba(232, 160, 122, 0.55);
+  box-shadow: 0 0 24px rgba(255, 181, 71, 0.25);
+  opacity: 0;
+  transform: scale(1);
+  transition-property: transform, opacity;
+  transition-timing-function: var(--ease);
+  transition-duration: 4000ms;
+}
+.stage[data-state='idle'] .breath {
+  opacity: 0.45;
+  transition-duration: 700ms;
+}
+.breath.holding {
+  opacity: 0.9;
+  transform: scale(4.2);
+}
+.breath.done {
+  opacity: 0;
+  transform: scale(4.8);
+  transition-duration: 900ms;
+}
+#ui.gentle .breath.holding {
+  transform: scale(2);
+}
+/* The prompt floats beside the lantern as a small handwritten caption: no box, nothing over the lantern. */
+.hint,
+.wish {
+  position: absolute;
+  top: var(--lantern-y);
+  margin: 0;
+  width: 140px;
+  font-family: var(--hand);
+  font-size: 1.25rem;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: var(--cream);
+  text-shadow:
+    0 1px 10px rgba(27, 27, 58, 0.95),
+    0 0 2px rgba(27, 27, 58, 1),
+    0 0 18px rgba(255, 181, 71, 0.25);
+  transition: opacity 260ms ease;
+  will-change: left, top;
+}
+.hint {
+  left: var(--hint-x, 50%);
+  transform: translateY(-84px);
+}
+.hint.left {
+  text-align: right;
+}
+.hint.fading {
+  opacity: 0;
+}
+/* The written text, on the other side of the lantern; glows and fades as the lantern rises. */
+.wish {
+  left: var(--wish-x, 50%);
+  transform: translateY(-70px);
+  font-size: 1.1rem;
+  color: var(--glow);
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+.wish.left {
+  text-align: right;
+}
+.wish.on {
+  opacity: 0.95;
+}
+.wish.rising {
+  opacity: 0;
+  transition: opacity 3000ms ease-in;
+  text-shadow:
+    0 0 10px rgba(255, 181, 71, 0.8),
+    0 1px 10px rgba(27, 27, 58, 0.95);
+}
+/* Small pills at the very bottom, clear of the lantern and of where people press. */
+.actions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(14px + var(--safe-bottom));
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  transition: opacity 800ms var(--ease);
+}
+.actions[data-empty='true'] {
+  display: none;
+}
+.actions.fade-in {
+  animation: fadeIn 900ms var(--ease) both;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Goodnight */
+.veil {
+  position: absolute;
+  inset: 0;
+  background: var(--night);
+  opacity: 0;
+  transition: opacity 2000ms var(--ease);
+}
+.veil.on {
+  opacity: 0.6;
+  pointer-events: auto;
+}
+.goodnight-line {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  top: 42%;
+  margin: 0;
+  text-align: center;
+  font-family: var(--hand);
+  font-size: 1.5rem;
+  line-height: 1.3;
+  text-shadow: 0 1px 12px rgba(27, 27, 58, 1);
+  opacity: 0;
+  transition: opacity 1200ms var(--ease) 600ms;
+}
+.goodnight-line.on {
+  opacity: 1;
+}
+
+/* ---------- Corner menu ---------- */
+.corner {
+  pointer-events: auto;
+  position: absolute;
+  top: calc(10px + var(--safe-top));
+  left: 10px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(232, 160, 122, 0.3);
+  background: rgba(27, 27, 58, 0.55);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: opacity 400ms ease;
+}
+.corner[hidden] {
+  display: none;
+}
+.corner i {
+  display: block;
+  width: 16px;
+  height: 2px;
+  background: var(--cream);
+  border-radius: 2px;
+  box-shadow:
+    0 -5px 0 var(--cream),
+    0 5px 0 var(--cream);
+}
+.menu-sheet {
+  pointer-events: auto;
+  position: absolute;
+  top: calc(60px + var(--safe-top));
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  opacity: 0;
+  transform: translateY(-4px);
+  visibility: hidden;
+  transition:
+    opacity 300ms ease,
+    transform 300ms ease,
+    visibility 0s linear 300ms;
+}
+.menu-sheet.on {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+/* ---------- Overlays: Your sky, Settings ---------- */
+/* While an overlay is open the screen underneath steps back. */
+#ui.overlay-open .screen,
+#ui.overlay-open .title,
+#ui.overlay-open .stage,
+#ui.overlay-open .goodnight-line,
+#ui.overlay-open .moon-btn,
+#ui.overlay-open .star-hit {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+#ui.overlay-open .screen .btn,
+#ui.overlay-open .stage .btn {
+  pointer-events: none;
+}
+.overlay {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 500ms var(--ease),
+    visibility 0s linear 500ms;
+}
+.overlay.on {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+.overlay .top {
+  position: absolute;
+  top: calc(14px + var(--safe-top));
+  left: 64px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.overlay .top h2 {
+  margin: 0;
+  font-family: var(--pixel);
+  font-weight: 400;
+  font-size: 1.9rem;
+  text-shadow: 0 2px 12px rgba(27, 27, 58, 0.9);
+}
+.overlay .bottom {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(20px + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+.sky-light {
+  pointer-events: auto;
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 197, 107, 0.35);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.sky-light[aria-pressed='true'] {
+  border-color: rgba(255, 244, 214, 0.9);
+  box-shadow: 0 0 14px rgba(255, 181, 71, 0.5);
+}
+.sky-card {
+  width: 100%;
+  max-width: 440px;
+}
+.sky-card[hidden] {
+  display: none;
+}
+.sky-card .date {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+  opacity: 0.75;
+}
+.sky-shade {
+  position: absolute;
+  inset: 0;
+  background: rgba(27, 27, 58, 0.35);
+}
+
+/* Settings sheet */
+.sheet {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(20px + var(--safe-bottom));
+  max-height: 80%;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+  touch-action: pan-y;
+}
+@media (min-width: 700px) {
+  .sheet {
+    left: 50%;
+    right: auto;
+    width: 440px;
+    transform: translateX(-50%);
+  }
+}
+.sheet h2 {
+  margin: 0;
+  font-family: var(--pixel);
+  font-weight: 400;
+  font-size: 1.7rem;
+}
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+}
+.setting .label {
+  font-family: var(--hand);
+  font-size: 1.2rem;
+}
+.switch {
+  pointer-events: auto;
+  width: 52px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 160, 122, 0.3);
+  background: rgba(27, 27, 58, 0.6);
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 300ms ease;
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--cream);
+  transition: transform 300ms var(--ease);
+}
+.switch[aria-checked='true'] {
+  background: rgba(255, 181, 71, 0.6);
+}
+.switch[aria-checked='true']::after {
+  transform: translateX(22px);
+}
+.sizes {
+  display: flex;
+  gap: 6px;
+}
+.sizes .btn {
+  min-width: 44px;
+  padding: 4px 10px;
+  font-family: var(--body);
+}
+.sizes .btn:nth-child(2) {
+  font-size: 1.15em;
+}
+.sizes .btn:nth-child(3) {
+  font-size: 1.3em;
+}
+.file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(224, 138, 60, 0.12);
+  border: 1px solid rgba(224, 138, 60, 0.35);
+}
+.confirm[hidden] {
+  display: none;
+}
+
+/* ---------- Moon ---------- */
+.moon-btn {
+  pointer-events: auto;
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.moon-label {
+  position: absolute;
+  padding: 8px 12px;
+  transform: translate(-50%, 10px);
+  text-align: center;
+  white-space: nowrap;
+  font-family: var(--hand);
+  font-size: 1.05rem;
+  line-height: 1.3;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 300ms ease,
+    visibility 0s linear 300ms;
+}
+.moon-label.on {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+.moon-label p {
+  margin: 0;
+}
+
+/* ---------- Shooting star ---------- */
+.star-hit {
+  pointer-events: auto;
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  margin: -32px 0 0 -32px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.star-hit[hidden] {
+  display: none;
+}
+.star-line {
+  position: absolute;
+  margin: 0;
+  width: 180px;
+  transform: translate(-50%, 14px);
+  text-align: center;
+  font-family: var(--hand);
+  font-size: 1.2rem;
+  color: var(--cream);
+  text-shadow:
+    0 1px 10px rgba(27, 27, 58, 0.95),
+    0 0 18px rgba(255, 181, 71, 0.35);
+  opacity: 0;
+  transition: opacity 400ms ease;
+}
+.star-line.on {
+  opacity: 1;
+}
+.sparkle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: var(--cream);
+  box-shadow: 0 0 18px 6px rgba(255, 244, 214, 0.7);
+  animation: sparkle 700ms var(--ease) both;
+}
+@keyframes sparkle {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+
+/* ---------- Toast (system messages) ---------- */
+.toast {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: calc(64px + var(--safe-top));
+  margin: 0 auto;
+  max-width: 440px;
+  padding: 10px 14px;
+  text-align: center;
+  font-size: 0.95rem;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 400ms ease,
+    visibility 0s linear 400ms;
+}
+.toast.on {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .breath {
+    transition-duration: 600ms !important;
+  }
+  .screen,
+  .overlay,
+  .title,
+  .actions.fade-in {
+    transition-duration: 300ms;
+    animation-duration: 300ms;
+  }
+}
+#ui.gentle .screen {
+  transform: none;
+}

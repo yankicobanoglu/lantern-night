@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { PALETTE } from '../src/palette';
-import { getLayout, openScene, sampleRect, saveScreenshots } from './helpers';
+import { foldLantern, getLayout, openRitual, sampleRect, saveScreenshots } from './helpers';
 
 const WARM: number[] = [PALETTE.lantern, PALETTE.lanternCore, PALETTE.ember, PALETTE.flame];
 
@@ -18,7 +18,8 @@ function restCss(page: Page): Promise<{ x: number; y: number }> {
 
 test.describe('lanterns', () => {
   test('an unlit lantern waits on the shore, in plum', async ({ page }, testInfo) => {
-    await openScene(page, 'date=2026-09-17');
+    await openRitual(page, 'date=2024-09-10');
+    await foldLantern(page, 'I am welcoming calm');
     const hold = await page.evaluate(() => window.__lantern!.hold());
     expect(hold.state).toBe('idle');
     const px = await restingRect(page);
@@ -31,7 +32,8 @@ test.describe('lanterns', () => {
   });
 
   test('letting go early eases the fill back down with no failure state', async ({ page }) => {
-    await openScene(page, 'date=2026-09-17');
+    await openRitual(page, 'date=2024-09-10');
+    await foldLantern(page, 'I am welcoming calm');
     const { x, y } = await restCss(page);
     await page.mouse.move(x, y);
     await page.mouse.down();
@@ -48,7 +50,8 @@ test.describe('lanterns', () => {
   });
 
   test('hold for 4 s to light, swipe up to release, rise and hand off to the sky', async ({ page }, testInfo) => {
-    await openScene(page, 'date=2026-09-17');
+    await openRitual(page, 'date=2024-09-10');
+    await foldLantern(page, 'I am welcoming calm');
     const { x, y } = await restCss(page);
     const skyBefore = await page.evaluate(() => window.__lantern!.skyLights());
 
@@ -84,17 +87,17 @@ test.describe('lanterns', () => {
     expect(mid.p).toBeLessThan(0.5);
     await saveScreenshots(page, testInfo, 'lantern-rising');
 
-    // No fresh lantern yet: the next one waits until this one has passed half of the sky.
-    expect(await page.evaluate(() => window.__lantern!.lanterns().some((l) => l.phase === 'unlit'))).toBe(false);
+    // No watch buttons yet: they wait until the lantern has passed half of the sky.
+    expect(await page.getByRole('button', { name: 'Light another' }).isVisible()).toBe(false);
     await expect(page.locator('#ui .hint')).toHaveClass(/left/);
 
-    // Speed time up: the next lantern appears once the first is above the middle of the sky (or already small).
+    // Speed time up: the buttons fade in once the lantern is above the middle of the sky (or already small).
     await page.evaluate(() => window.__lantern!.speed(8));
-    await page.waitForFunction(() => window.__lantern!.lanterns().some((l) => l.phase === 'unlit'), undefined, { timeout: 15_000 });
+    await expect(page.getByRole('button', { name: 'Light another' })).toBeVisible({ timeout: 15_000 });
     const risen = await page.evaluate(() => window.__lantern!.lanterns().find((l) => l.phase === 'rising')!);
     const { horizon } = await getLayout(page);
     expect(risen.y <= horizon * 0.5 + 8 || risen.p >= 0.85).toBe(true);
-    await expect(page.locator('#ui .hint')).toHaveText('Hold to light your lantern');
+    await expect(page.locator('#ui .hint')).toHaveText('Stay as long as you like.');
 
     // Wait for the hand-off.
     await page.waitForFunction((n) => window.__lantern!.skyLights() === n + 1, skyBefore, { timeout: 15_000 });
@@ -105,7 +108,8 @@ test.describe('lanterns', () => {
   });
 
   test('the tap alternative lights the lantern and the button releases it', async ({ page }) => {
-    await openScene(page, 'date=2026-09-17&motion=gentle');
+    await openRitual(page, 'date=2024-09-10&motion=gentle');
+    await foldLantern(page, 'I am welcoming calm');
     await page.getByRole('button', { name: 'Light it' }).click();
     await page.waitForFunction(() => window.__lantern!.hold().state === 'lit', undefined, { timeout: 4000 });
     await page.getByRole('button', { name: 'Let it rise' }).click();
@@ -113,7 +117,8 @@ test.describe('lanterns', () => {
   });
 
   test('never more than 12 rising lanterns', async ({ page }) => {
-    await openScene(page, 'date=2026-09-17&lanterns=12');
+    await openRitual(page, 'date=2024-09-10&lanterns=12');
+    await foldLantern(page, 'I am welcoming calm');
     const n = await page.evaluate(() => window.__lantern!.lanterns().filter((l) => l.phase === 'rising').length);
     expect(n).toBe(12);
     await page.evaluate(() => window.__lantern!.light());

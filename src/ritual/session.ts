@@ -1,0 +1,414 @@
+import { STAR_FIRST_SESSION_MAX_S, STAR_INTERVAL_MAX_S, STAR_INTERVAL_MIN_S, WATCH_BUTTONS_MIN_PROGRESS, WATCH_BUTTONS_SKY_FRACTION } from '../config';
+import type { Layout } from '../engine/layout';
+import { systemMotionLevel, type MotionLevel } from '../engine/motion';
+import { createRng } from '../engine/rng';
+import type { Lantern as SceneLantern } from '../scene/lantern';
+import type { Scene } from '../scene/scene';
+import { pickStarPath, type StarAvoid } from '../scene/shootingStar';
+import { backupFileName, parseBackup, serializeBackup } from '../store/backup';
+import type { Store } from '../store/store';
+import type { Lantern, Settings } from '../store/types';
+import { ArriveScreen } from '../ui/arrive';
+import { el } from '../ui/dom';
+import { IntentionScreen } from '../ui/intention';
+import { LightUi } from '../ui/lightUi';
+import { Menu } from '../ui/menu';
+import { MoonLabel } from '../ui/moonLabel';
+import { ReturnScreen, type ReturnAnswer } from '../ui/returnCard';
+import { SettingsSheet } from '../ui/settings';
+import { SkyView } from '../ui/skyView';
+import { StarUi } from '../ui/starUi';
+import { Toast } from '../ui/toast';
+import { COPY, defaultMode, type Mode } from './copy';
+import { HoldController } from './hold';
+import { Machine, type State } from './machine';
+import { moonAge, moonKind } from './moonPhase';
+
+export type SessionDeps = {
+  root: HTMLElement;
+  canvas: HTMLCanvasElement;
+  scene: Scene;
+  store: Store;
+  layout: () => Layout;
+  now: () => Date;
+  /** ?motion= override for tests. */
+  motionOverride: MotionLevel | null;
+  /** ?star=now: the first shooting star comes right away. */
+  starNow: boolean;
+  seed: number;
+};
+
+/**
+ * The ritual (SPEC section 3): wires the state machine to the store, the
+ * scene and the DOM screens. Overlays (Your sky, Settings, moon label,
+ * shooting star) sit beside the state and never change it.
+ */
+export class Session {
+  readonly machine = new Machine();
+  readonly hold: HoldController;
+  mode: Mode = 'wish';
+  /** The lantern released most recently (for the watch rule and the caption). */
+  released: SceneLantern | null = null;
+  private watchShown = false;
+  private readonly arrive: ArriveScreen;
+  private readonly returnCard: ReturnScreen;
+  private readonly intention: IntentionScreen;
+  private readonly lightUi: LightUi;
+  private readonly skyView: SkyView;
+  private readonly settings: SettingsSheet;
+  readonly menu: Menu;
+  private readonly moon: MoonLabel;
+  private readonly toast: Toast;
+  private readonly starUi: StarUi;
+  private readonly veil: HTMLElement;
+  private readonly goodnightLine: HTMLElement;
+  private readonly rng;
+  private nextStarIn = Infinity;
+  private goodnightAt = 0;
+
+  constructor(private readonly deps: SessionDeps) {
+    const { root, scene } = deps;
+    this.rng = createRng(deps.seed ^ 0x5bd1e995);
+    root.dataset['state'] = 'loading';
+
+    this.hold = new HoldController(deps.canvas, {
+      onFill: (fill, holding) => {
+        const l = scene.lanterns.resting;
+        if (l) l.fill = fill;
+        this.lightUi.holding(holding);
+      },
+      onLit: () => {
+        const l = scene.lanterns.resting;
+        if (l) {
+          l.fill = 1;
+          l.phase = 'lit';
+        }
+        this.lightUi.lit();
+      },
+      onRelease: () => void this.release(),
+    });
+
+    this.lightUi = new LightUi(root, this.motion(), {
+      onLightTap: () => this.hold.lightByTap(),
+      onRelease: () => this.hold.releaseNow(),
+      onAnother: () => this.lightAnother(),
+      onGoodnight: () => this.goodnight(),
+    });
+    this.arrive = new ArriveScreen(root, () => this.begin());
+    this.returnCard = new ReturnScreen(
+      root,
+      (l, answer) => void this.answerReturn(l, answer),
+      () => this.showIntention(),
+    );
+    this.intention = new IntentionScreen(root, (mode, text) => this.fold(mode, text));
+    this.veil = el('div', { class: 'veil', 'aria-hidden': 'true' });
+    this.goodnightLine = el('p', { class: 'goodnight-line', role: 'status', 'aria-live': 'polite' });
+    this.veil.addEventListener('click', () => {
+      if (this.machine.state === 'goodnight' && performance.now() >= this.goodnightAt) this.backToArrive();
+    });
+    root.append(this.veil, this.goodnightLine);
+    this.skyView = new SkyView(root, () => this.closeOverlays());
+    this.settings = new SettingsSheet(root, {
+      onChange: (patch) => void this.changeSettings(patch),
+      onSave: () => void this.saveBackup(),
+      onRestore: (file) => void this.restoreBackup(file),
+      onClear: () => void this.clearSky(),
+      onClose: () => this.closeOverlays(),
+    });
+    this.menu = new Menu(root, {
+      onSky: () => {
+        this.settings.hide();
+        this.skyView.show(this.deps.store.lanterns, this.deps.layout());
+        root.classList.add('overlay-open');
+      },
+      onSettings: () => {
+        this.skyView.hide();
+        this.settings.show(this.deps.store.settings, this.motion());
+        root.classList.add('overlay-open');
+      },
+    });
+    this.moon = new MoonLabel(root, deps.now);
+    this.toast = new Toast(root);
+    this.starUi = new StarUi(root, (x, y) => this.tapStar(x, y));
+    this.moon.place(deps.layout());
+
+    this.machine.onChange((t) => {
+      root.dataset['state'] = t.to;
+    });
+  }
+
+  // ---------- Settings-derived ----------
+
+  motion(): MotionLevel {
+    if (this.deps.motionOverride) return this.deps.motionOverride;
+    const m = this.deps.store.settings.motion;
+    return m === 'system' ? systemMotionLevel() : m;
+  }
+
+  private applySettings(): void {
+    const s = this.deps.store.settings;
+    document.documentElement.style.setProperty('--text-scale', String(s.textScale));
+    const m = this.motion();
+    this.deps.scene.setMotion(m);
+    this.lightUi.setMotion(m);
+  }
+
+  private async changeSettings(patch: Partial<Settings>): Promise<void> {
+    await this.deps.store.saveSettings(patch).catch(() => undefined);
+    this.applySettings();
+  }
+
+  // ---------- Start ----------
+
+  async start(): Promise<void> {
+    const { store, scene } = this.deps;
+    await store.load();
+    for (const l of store.lanterns) scene.skyLights.add({ id: l.id, seed: l.seed, sky: l.sky, status: l.status });
+    this.applySettings();
+    this.machine.go('arrive');
+    this.showArrive();
+    if (!store.available) this.toast.show(COPY.system.storageUnavailable, 8000);
+    // Shooting stars: on a first-ever session one appears within the first 60 s.
+    const first = store.settings.sessions === 0;
+    this.nextStarIn = this.deps.starNow ? 0.3 : first ? this.rng.range(12, STAR_FIRST_SESSION_MAX_S - 5) : this.rng.range(STAR_INTERVAL_MIN_S, STAR_INTERVAL_MAX_S);
+  }
+
+  private moonNow(): ReturnType<typeof moonKind> {
+    return moonKind(moonAge(this.deps.now()));
+  }
+
+  private showArrive(): void {
+    this.arrive.show(this.deps.store.lanterns.length > 0, this.moonNow());
+  }
+
+  private begin(): void {
+    if (this.machine.state !== 'arrive') return;
+    const { store } = this.deps;
+    void store.saveSettings({ sessions: store.settings.sessions + 1 }).catch(() => undefined);
+    this.arrive.hide();
+    const due = store.due(this.deps.now())[0];
+    if (due && this.machine.go('return')) {
+      this.returnCard.show(due);
+      return;
+    }
+    this.showIntention();
+  }
+
+  private showIntention(): void {
+    if (!this.machine.go('intention')) return;
+    this.returnCard.hide();
+    this.lightUi.hide();
+    this.mode = defaultMode(this.moonNow());
+    this.intention.show(this.mode);
+  }
+
+  private async answerReturn(l: Lantern, answer: ReturnAnswer): Promise<void> {
+    const updated = await this.deps.store.answerReturn(l.id, answer, this.deps.now()).catch(() => undefined);
+    if (updated) this.deps.scene.skyLights.setStatus(updated.id, updated.status);
+  }
+
+  // ---------- Light → release → watch ----------
+
+  private fold(mode: Mode, text: string): void {
+    if (!this.machine.go('light')) return;
+    this.mode = mode;
+    this.intention.hide();
+    const l = this.deps.scene.lanterns.spawnResting();
+    l.wishText = text;
+    this.lightUi.setWish(text);
+    this.followLantern();
+    this.hold.arm();
+    this.lightUi.idle();
+  }
+
+  private async release(): Promise<void> {
+    const { scene, store } = this.deps;
+    const l = scene.lanterns.resting;
+    if (!l || !scene.lanterns.release(l) || !l.sky) return;
+    this.machine.go('release');
+    this.released = l;
+    this.watchShown = false;
+    this.lightUi.released(this.mode);
+    this.machine.go('watch');
+    if (this.mode === 'wish') {
+      try {
+        const record = await store.add({ text: l.wishText ?? '', sky: l.sky, seed: l.seed, now: this.deps.now() });
+        l.storedId = record.id;
+      } catch {
+        this.toast.show(COPY.system.storageUnavailable, 8000);
+      }
+    }
+    // Let-go text is never stored (SPEC section 6): drop it as soon as the lantern is on its way.
+    l.wishText = null;
+  }
+
+  /** The released lantern is well on its way: above the middle of the sky band, or already small. */
+  private farEnough(l: SceneLantern): boolean {
+    return l.phase !== 'rising' || l.y <= this.deps.layout().horizon * (1 - WATCH_BUTTONS_SKY_FRACTION) || l.rise.p >= WATCH_BUTTONS_MIN_PROGRESS;
+  }
+
+  private lightAnother(): void {
+    if (this.machine.state !== 'watch') return;
+    this.released = null;
+    this.showIntention();
+  }
+
+  private goodnight(): void {
+    if (!this.machine.go('goodnight')) return;
+    this.lightUi.hide();
+    this.released = null;
+    this.goodnightLine.textContent = this.mode === 'wish' ? COPY.goodnight.wish : COPY.goodnight.letGo;
+    this.veil.classList.add('on');
+    this.goodnightLine.classList.add('on');
+    this.goodnightAt = performance.now() + 1500;
+  }
+
+  private backToArrive(): void {
+    if (!this.machine.go('arrive')) return;
+    this.veil.classList.remove('on');
+    this.goodnightLine.classList.remove('on');
+    this.showArrive();
+  }
+
+  // ---------- Overlays ----------
+
+  private closeOverlays(): void {
+    this.skyView.hide();
+    this.settings.hide();
+    this.deps.root.classList.remove('overlay-open');
+  }
+
+  private followLantern(): void {
+    const { scene, layout } = this.deps;
+    const L = layout();
+    const l = scene.lanterns.resting ?? (this.released && this.released.phase === 'rising' ? this.released : null);
+    if (l) this.lightUi.follow(l.x * L.cssScale, l.y * L.cssScale, window.innerWidth);
+  }
+
+  private async saveBackup(): Promise<void> {
+    const { store, now } = this.deps;
+    const at = now();
+    const text = serializeBackup(store.lanterns, store.settings, at);
+    const name = backupFileName(at);
+    const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+    let shared = false;
+    if (typeof File !== 'undefined' && nav.canShare && nav.share) {
+      const file = new File([text], name, { type: 'application/json' });
+      if (nav.canShare({ files: [file] })) {
+        try {
+          await nav.share({ files: [file], title: COPY.title });
+          shared = true;
+        } catch (e) {
+          if ((e as { name?: string }).name === 'AbortError') return;
+        }
+      }
+    }
+    if (!shared) {
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      const a = el('a', { href: url, download: name });
+      document.body.append(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    }
+    await store.saveSettings({ lastBackupAt: at.toISOString() }).catch(() => undefined);
+    this.toast.show(COPY.settings.saved);
+  }
+
+  private async restoreBackup(file: File): Promise<void> {
+    const text = await file.text().catch(() => '');
+    const backup = parseBackup(text);
+    if (!backup) {
+      this.toast.show(COPY.settings.wrongFile, 8000);
+      return;
+    }
+    const before = new Set(this.deps.store.lanterns.map((l) => l.id));
+    const added = await this.deps.store.merge(backup.lanterns).catch(() => 0);
+    for (const l of this.deps.store.lanterns) {
+      if (!before.has(l.id)) this.deps.scene.skyLights.add({ id: l.id, seed: l.seed, sky: l.sky, status: l.status });
+    }
+    this.toast.show(`${COPY.settings.restored} ${COPY.settings.restoredCount(added)}`, 7000);
+    if (this.skyView.isOpen) this.skyView.show(this.deps.store.lanterns, this.deps.layout());
+  }
+
+  private async clearSky(): Promise<void> {
+    await this.deps.store.clear().catch(() => undefined);
+    this.deps.scene.skyLights.clear();
+    if (this.skyView.isOpen) this.skyView.show(this.deps.store.lanterns, this.deps.layout());
+  }
+
+  // ---------- Shooting stars ----------
+
+  private trySpawnStar(): void {
+    const { scene, layout } = this.deps;
+    const L = layout();
+    const css = L.cssScale;
+    const avoid: StarAvoid[] = scene.lanterns.lanterns.filter((l) => l.phase !== 'done').map((l) => ({ x: l.x * css, y: l.y * css, r: 60 }));
+    const path = pickStarPath(L, this.rng.int(1, 1 << 30), avoid);
+    if (!path) {
+      this.nextStarIn = 5;
+      return;
+    }
+    scene.star.spawn(path);
+    // Sound hook (M4): a faint shimmer on spawn when sound is on.
+    this.nextStarIn = this.rng.range(STAR_INTERVAL_MIN_S, STAR_INTERVAL_MAX_S);
+  }
+
+  /** Test hook: spawn a star now, ignoring the schedule. */
+  spawnStarNow(): boolean {
+    const L = this.deps.layout();
+    const path = pickStarPath(L, this.rng.int(1, 1 << 30), []);
+    if (!path) return false;
+    this.deps.scene.star.spawn(path);
+    return true;
+  }
+
+  private tapStar(x: number, y: number): void {
+    if (!this.deps.scene.star.head()) return;
+    this.deps.scene.star.end();
+    this.starUi.tapped(x, y);
+  }
+
+  private starFinishedUntapped(): void {
+    const { store } = this.deps;
+    if (store.settings.starHintShown) return;
+    void store.saveSettings({ starHintShown: true }).catch(() => undefined);
+    this.toast.show(COPY.star.hint, 7000);
+  }
+
+  // ---------- Per frame ----------
+
+  update(dtMs: number): void {
+    const { scene } = this.deps;
+    this.hold.update(dtMs);
+    const state: State = this.machine.state;
+    // Stars only during arrive and watch (SPEC section 3).
+    if ((state === 'arrive' || state === 'watch') && !scene.star.active) {
+      this.nextStarIn -= (dtMs / 1000) * scene.speed;
+      if (this.nextStarIn <= 0) this.trySpawnStar();
+    }
+    if (scene.starDone) this.starFinishedUntapped();
+    this.starUi.follow(scene.star.head());
+    if (state === 'watch' && this.released && !this.watchShown && this.farEnough(this.released)) {
+      this.watchShown = true;
+      this.lightUi.watch();
+    }
+    if (state === 'watch' && this.released && this.released.phase === 'done') {
+      this.released = null;
+      this.lightUi.settled();
+    }
+    this.followLantern();
+  }
+
+  resize(layout: Layout): void {
+    this.moon.place(layout);
+    if (this.skyView.isOpen) this.skyView.place(layout);
+    this.lightUi.setMotion(this.motion());
+    this.followLantern();
+  }
+
+  /** Test hook. */
+  star(): { x: number; y: number } | null {
+    return this.deps.scene.star.head();
+  }
+}

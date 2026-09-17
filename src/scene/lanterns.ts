@@ -8,7 +8,7 @@ import type { RiseOptions } from './lanternPhysics';
 import { LanternTextures } from './lanternTextures';
 import { pickSkyPoint, skyToArt, type SkyBounds, type SkyPoint } from './skyPoint';
 
-export type HandOff = { seed: number; sky: SkyPoint };
+export type HandOff = { seed: number; sky: SkyPoint; id: string | null };
 
 /**
  * Manages the active lanterns: at most one waiting over the dock, up to
@@ -89,7 +89,7 @@ export class LanternField {
   }
 
   private handOff(l: Lantern): void {
-    if (l.sky) this.onHandOff?.({ seed: l.seed, sky: l.sky });
+    if (l.sky) this.onHandOff?.({ seed: l.seed, sky: l.sky, id: l.storedId });
     l.destroy();
     const i = this.lanterns.indexOf(l);
     if (i >= 0) this.lanterns.splice(i, 1);

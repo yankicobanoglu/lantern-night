@@ -1,15 +1,15 @@
 import { UPDATE_PRIORITY } from 'pixi.js';
-import { NEXT_LANTERN_MIN_PROGRESS, NEXT_LANTERN_SKY_FRACTION } from './config';
+import './styles.css';
 import { frameForNow, installDebug, mountFpsOverlay, readDebugOptions } from './debug';
 import { createApp } from './engine/app';
 import { computeLayout } from './engine/layout';
 import { systemMotionLevel, type MotionLevel } from './engine/motion';
 import { FrameStats } from './engine/ticker';
-import { HoldController } from './ritual/hold';
-import type { Lantern } from './scene/lantern';
+import { Session } from './ritual/session';
 import { Scene } from './scene/scene';
 import { pickSkyPoint } from './scene/skyPoint';
-import { LightUi } from './ui/lightUi';
+import { openKv } from './store/kv';
+import { Store } from './store/store';
 
 async function boot(): Promise<void> {
   const canvas = document.getElementById('world');
@@ -35,50 +35,20 @@ async function boot(): Promise<void> {
   }
   for (let i = 0; i < opts.risingLanterns; i++) scene.lanterns.spawnRising((i + 0.5) / (opts.risingLanterns + 1) * 0.8);
 
-  // Ritual wiring (M2: light → release → next lantern; M3 adds the full state machine).
-  const ui = new LightUi(uiRoot, motion(), {
-    onLightTap: () => hold.lightByTap(),
-    onRelease: () => hold.releaseNow(),
+  const store = new Store(await openKv());
+  const session = new Session({
+    root: uiRoot,
+    canvas,
+    scene,
+    store,
+    layout: () => layout,
+    now: opts.now,
+    motionOverride: opts.motion,
+    starNow: opts.starNow,
+    seed: opts.seed,
   });
-  let released: Lantern | null = null;
-  const follow = (): void => {
-    const l = scene.lanterns.resting ?? (released && released.phase === 'rising' ? released : null);
-    if (l) ui.follow(l.x * layout.cssScale, l.y * layout.cssScale, window.innerWidth);
-  };
-  const hold: HoldController = new HoldController(canvas, {
-    onFill: (fill, holding) => {
-      const l = scene.lanterns.resting;
-      if (l) l.fill = fill;
-      ui.holding(holding);
-    },
-    onLit: () => {
-      const l = scene.lanterns.resting;
-      if (l) {
-        l.fill = 1;
-        l.phase = 'lit';
-      }
-      ui.lit();
-    },
-    onRelease: () => {
-      const l = scene.lanterns.resting;
-      if (l && scene.lanterns.release(l)) {
-        released = l;
-        ui.released('wish');
-      }
-    },
-  });
-  const nextLantern = (): void => {
-    scene.lanterns.spawnResting();
-    follow();
-    hold.arm();
-    ui.idle();
-  };
-  /** The released lantern is well on its way: above the middle of the sky, or already small. */
-  const farEnough = (l: Lantern): boolean =>
-    l.phase !== 'rising' || l.y <= layout.horizon * (1 - NEXT_LANTERN_SKY_FRACTION) || l.rise.p >= NEXT_LANTERN_MIN_PROGRESS;
-  nextLantern();
 
-  installDebug(app, scene, hold, stats, cpu, () => layout);
+  installDebug(app, scene, session, store, stats, cpu, () => layout);
   if (opts.showFps) mountFpsOverlay(stats, cpu);
 
   let resizeTimer = 0;
@@ -87,10 +57,9 @@ async function boot(): Promise<void> {
     resizeTimer = window.setTimeout(() => {
       app.renderer.resize(window.innerWidth, window.innerHeight);
       layout = computeLayout(window.innerWidth, window.innerHeight, app.renderer.resolution);
-      scene.resize(layout, motion());
+      scene.resize(layout, session.motion());
       scene.setMoonFrame(frameForNow(opts));
-      ui.setMotion(motion());
-      follow();
+      session.resize(layout);
     }, 80);
   };
   window.addEventListener('resize', onResize);
@@ -99,10 +68,8 @@ async function boot(): Promise<void> {
     (ticker) => {
       stats.push(ticker.deltaMS);
       const t0 = performance.now();
-      hold.update(ticker.deltaMS);
       scene.update(ticker.deltaMS);
-      if (released && !scene.lanterns.resting && farEnough(released)) nextLantern();
-      follow();
+      session.update(ticker.deltaMS);
       cpu.push(performance.now() - t0);
       if (window.__lantern && !window.__lantern.ready) {
         window.__lantern.ready = true;
@@ -112,6 +79,8 @@ async function boot(): Promise<void> {
     undefined,
     UPDATE_PRIORITY.HIGH,
   );
+
+  await session.start();
 }
 
 boot().catch((err: unknown) => {

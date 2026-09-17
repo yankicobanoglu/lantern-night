@@ -15,6 +15,7 @@ import { Lake } from './lake';
 import { LanternField } from './lanterns';
 import { Moon } from './moon';
 import { drawShore } from './shore';
+import { ShootingStar } from './shootingStar';
 import { drawSky, type Star } from './sky';
 import { SkyLights } from './skyLights';
 
@@ -25,6 +26,7 @@ export class Scene {
   readonly skyLights: SkyLights;
   readonly fireflies: Fireflies;
   readonly cozy: Cozy;
+  readonly star: ShootingStar;
   /** Time multiplier for the animated parts (test hook; 1 in normal use). */
   speed = 1;
   private lake: Lake;
@@ -38,6 +40,8 @@ export class Scene {
   private windows: Window[] = [];
   private slow: SlowTick;
   private timeMs = 0;
+  /** True on the frame a shooting star finished untapped. */
+  starDone = false;
   layout: Layout;
 
   constructor(renderer: Renderer, stage: Container, layout: Layout, readonly seed: number, motion: MotionLevel) {
@@ -54,16 +58,18 @@ export class Scene {
     this.lanterns = new LanternField(layout, seed);
     this.lanterns.motion = motion;
     this.lanterns.existingSky = () => this.skyLights.points;
-    this.lanterns.onHandOff = (h) => this.skyLights.add({ seed: h.seed, sky: h.sky, status: 'rising' });
+    this.lanterns.onHandOff = (h) => this.skyLights.add({ seed: h.seed, sky: h.sky, status: 'rising', ...(h.id ? { id: h.id } : {}) });
     this.fireflies = new Fireflies(layout, seed, motion);
     this.cozy = new Cozy(layout, seed);
+    this.star = new ShootingStar(layout);
+    this.star.motion = motion;
 
     // Pixel layers, back to front.
     this.pipeline.above.addChild(this.staticSprite, this.overlaySprite, this.cozy.smokeSprite, this.skyLights.sprite, this.moon.sprite, this.lanterns.aboveLayer);
     this.lake = new Lake(layout, this.pipeline.aboveRT);
     this.pipeline.world.addChild(this.lake.container, this.cozy.boatSprite, this.lanterns.nearLayer, this.shoreSprite, this.fireflies.sprite);
     // Light layer: sky halos under the lanterns' own light, fireflies on top.
-    this.pipeline.light.addChild(this.cozy.light, this.skyLights.halos, this.lanterns.lightLayer, this.fireflies.light);
+    this.pipeline.light.addChild(this.cozy.light, this.skyLights.halos, this.lanterns.lightLayer, this.fireflies.light, this.star.container);
 
     this.slow = new SlowTick(SLOW_TICK_HZ, (t) => this.slowTick(t));
     this.build(layout);
@@ -93,9 +99,17 @@ export class Scene {
     this.slowTick(this.slow.tick);
   }
 
+  /** Settings or the system changed the motion level. */
+  setMotion(motion: MotionLevel): void {
+    this.lanterns.motion = motion;
+    this.star.motion = motion;
+    this.fireflies.build(this.layout, motion);
+  }
+
   resize(layout: Layout, motion: MotionLevel): void {
     this.layout = layout;
     this.pipeline.resize(layout);
+    this.star.resize(layout);
     this.lake.build(layout, this.pipeline.aboveRT);
     this.skyLights.resize(layout);
     this.lanterns.resize(layout);
@@ -118,6 +132,7 @@ export class Scene {
     this.skyLights.update(tSec);
     this.fireflies.update(dt / 1000, tSec);
     this.cozy.update(tSec);
+    this.starDone = this.star.update(dt / 1000);
     this.pipeline.render();
   }
 
