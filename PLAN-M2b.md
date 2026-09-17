@@ -25,3 +25,9 @@ Feedback on M2 (2026-09-17) and the agreed direction. Pixel scale stays as in se
 - Found by the tests and fixed: the hint cross-fade timer was reset every frame while holding, so "Breathe in…" never appeared. The headless perf smoke check now asserts only that the loop is alive (frames > 30), since the software GPU runs well under 60 fps with 1,000 additive halos; fps numbers come from headed runs.
 - Fonts: Nunito (variable 400–600) and Pixelify Sans, Latin subsets, OFL, self-hosted in `public/fonts`. Pixelify Sans is declared but unused until the M3 title.
 - Open for the iPhone check: rise pacing, whether 1,000 additive halos hold 60 fps on the device (mitigation in PLAN-M2 risks: cap halos at the newest 300), and how the panel sits above the lantern with the home indicator.
+
+## Second review pass (2026-09-17)
+
+- **Prompts.** The panel is gone. The prompt is a small handwritten caption (Patrick Hand, OFL, Latin subset, self-hosted) that floats beside the lantern on the side with more room, follows it every frame, and follows the rising lantern for the release lines. Nothing sits over the lantern or where people press. *Light it* and *Let it rise* are small pills at the very bottom. Typography deviation from section 7: Patrick Hand for prompts and buttons instead of Nunito, at the user's request for a cozier feel; Nunito stays available for longer text in M3.
+- **Foreground.** The shore has a lighter grass fringe, tufts and blades all the way down (denser near the water), pebbles and a few blush flower dots. The lantern's footing is kept clear.
+- 41 unit and 46 end-to-end tests pass (both browsers, both viewports).

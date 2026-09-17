@@ -18,10 +18,34 @@ export function drawShore(buf: PixelBuffer, layout: Layout, seed: number): void 
     const bump = hash01(Math.floor(x / 3), seed + 71) < 0.4 ? -1 : 0;
     buf.vline(x, top + bump, rows, PALETTE.shore);
   }
-  // Grass texture: sparse lighter blades on the first rows of ground.
+  // Grass: a lighter fringe along the edge, then tufts all the way down (denser near the water),
+  // with a few pebbles and blush flower dots for warmth.
   for (let x = 0; x < width; x++) {
-    for (let y = top; y < top + 5; y++) {
-      if (hash01(x * 131 + y, seed + 72) < 0.16) buf.set(x, y, PALETTE.nearHills);
+    if (hash01(x, seed + 75) < 0.55) buf.set(x, top + (hash01(x, seed + 76) < 0.5 ? 0 : 1), PALETTE.nearHills);
+  }
+  const tufts = Math.round((width * (rows - top)) / 14);
+  for (let i = 0; i < tufts; i++) {
+    const x = Math.floor(hash01(i, seed + 77) * width);
+    const depth = hash01(i, seed + 78);
+    const y = top + 2 + Math.floor(depth * depth * (rows - top - 4));
+    if (Math.abs(x - centreX) < 11 && y < top + 8) continue; // keep the lantern's footing tidy
+    const kind = hash01(i, seed + 79);
+    if (kind < 0.55) {
+      // Tuft: a small V of blades.
+      buf.set(x, y, PALETTE.nearHills);
+      buf.set(x - 1, y - 1, PALETTE.nearHills);
+      buf.set(x + 1, y - 1, PALETTE.nearHills);
+      if (kind < 0.2) buf.set(x, y - 2, PALETTE.farHills);
+    } else if (kind < 0.8) {
+      // Single blade.
+      buf.vline(x, y - 1, y + 1, PALETTE.nearHills);
+    } else if (kind < 0.95) {
+      // Pebble.
+      buf.hline(x, x + 2, y, PALETTE.farHills);
+    } else {
+      // Flower dot on a stem.
+      buf.set(x, y, PALETTE.nearHills);
+      buf.set(x, y - 1, PALETTE.blush);
     }
   }
   // A few rocks at the water's edge, away from the lantern.

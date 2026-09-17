@@ -6,6 +6,7 @@ import { computeLayout } from './engine/layout';
 import { systemMotionLevel, type MotionLevel } from './engine/motion';
 import { FrameStats } from './engine/ticker';
 import { HoldController } from './ritual/hold';
+import type { Lantern } from './scene/lantern';
 import { Scene } from './scene/scene';
 import { pickSkyPoint } from './scene/skyPoint';
 import { LightUi } from './ui/lightUi';
@@ -39,9 +40,10 @@ async function boot(): Promise<void> {
     onLightTap: () => hold.lightByTap(),
     onRelease: () => hold.releaseNow(),
   });
-  const placeRing = (): void => {
-    const l = scene.lanterns.resting;
-    if (l) ui.placeRing(l.x * layout.cssScale, l.y * layout.cssScale);
+  let released: Lantern | null = null;
+  const follow = (): void => {
+    const l = scene.lanterns.resting ?? (released && released.phase === 'rising' ? released : null);
+    if (l) ui.follow(l.x * layout.cssScale, l.y * layout.cssScale, window.innerWidth);
   };
   const hold: HoldController = new HoldController(canvas, {
     onFill: (fill, holding) => {
@@ -60,6 +62,7 @@ async function boot(): Promise<void> {
     onRelease: () => {
       const l = scene.lanterns.resting;
       if (l && scene.lanterns.release(l)) {
+        released = l;
         ui.released('wish');
         window.setTimeout(nextLantern, NEXT_LANTERN_DELAY_MS);
       }
@@ -67,7 +70,7 @@ async function boot(): Promise<void> {
   });
   const nextLantern = (): void => {
     scene.lanterns.spawnResting();
-    placeRing();
+    follow();
     hold.arm();
     ui.idle();
   };
@@ -85,7 +88,7 @@ async function boot(): Promise<void> {
       scene.resize(layout, motion());
       scene.setMoonFrame(frameForNow(opts));
       ui.setMotion(motion());
-      placeRing();
+      follow();
     }, 80);
   };
   window.addEventListener('resize', onResize);
@@ -96,6 +99,7 @@ async function boot(): Promise<void> {
       const t0 = performance.now();
       hold.update(ticker.deltaMS);
       scene.update(ticker.deltaMS);
+      follow();
       cpu.push(performance.now() - t0);
       if (window.__lantern && !window.__lantern.ready) {
         window.__lantern.ready = true;

@@ -20,12 +20,10 @@ export class LightUi {
     this.root = root;
     root.innerHTML = `
       <div class="breath" aria-hidden="true"></div>
-      <div class="panel">
-        <p class="hint" role="status" aria-live="polite"></p>
-        <div class="actions">
-          <button type="button" class="btn ghost" data-action="light">${COPY.light.tapAlternative}</button>
-          <button type="button" class="btn primary" data-action="release">${COPY.release.letItRise}</button>
-        </div>
+      <p class="hint" role="status" aria-live="polite"></p>
+      <div class="actions">
+        <button type="button" class="btn ghost" data-action="light">${COPY.light.tapAlternative}</button>
+        <button type="button" class="btn primary" data-action="release">${COPY.release.letItRise}</button>
       </div>`;
     this.ring = root.querySelector('.breath') as HTMLElement;
     this.hint = root.querySelector('.hint') as HTMLElement;
@@ -42,12 +40,21 @@ export class LightUi {
     this.root.classList.toggle('gentle', motion === 'gentle');
   }
 
-  /** Position the breath ring around the lantern (CSS px). */
-  placeRing(cssX: number, cssY: number): void {
+  /**
+   * Follow the lantern (CSS px): the breath ring sits around it and the caption
+   * floats beside it, on whichever side has more room.
+   */
+  follow(cssX: number, cssY: number, viewportWidth: number): void {
     this.ring.style.left = `${cssX}px`;
     this.ring.style.top = `${cssY}px`;
-    // The hint line sits just above the lantern, never over it.
-    this.root.style.setProperty('--lantern-y', `${cssY}px`);
+    this.root.style.setProperty('--lantern-y', `${cssY.toFixed(1)}px`);
+    // Caption beside the lantern, on the side with more room, kept inside a 12 px gutter.
+    const gap = 40;
+    const w = 140;
+    const left = cssX > viewportWidth / 2;
+    const x = left ? Math.max(12, cssX - gap - w) : Math.min(cssX + gap, viewportWidth - 12 - w);
+    this.root.style.setProperty('--hint-x', `${x.toFixed(1)}px`);
+    this.hint.classList.toggle('left', left);
   }
 
   private fadeTimer = 0;

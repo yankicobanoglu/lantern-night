@@ -15,6 +15,13 @@
         src: url('fonts/nunito-latin.woff2') format('woff2');
       }
       @font-face {
+        font-family: 'Patrick Hand';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('fonts/patrick-hand-latin.woff2') format('woff2');
+      }
+      @font-face {
         font-family: 'Pixelify Sans';
         font-style: normal;
         font-weight: 400;
@@ -28,7 +35,9 @@
         --cream: #fff4d6;
         --ink: #2a1a0a;
         --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --lantern-x: 50%;
         --lantern-y: 70%;
+        --hand: 'Patrick Hand', 'Nunito', system-ui, sans-serif;
       }
       html, body {
         margin: 0;
@@ -79,49 +88,45 @@
       .breath.holding { opacity: 0.9; transform: scale(4.2); }
       .breath.done { opacity: 0; transform: scale(4.8); transition-duration: 900ms; }
       #ui.gentle .breath.holding { transform: scale(2); }
-      /* One translucent night panel above the lantern (SPEC section 7, UI surfaces). */
-      .panel {
-        position: absolute;
-        left: 50%;
-        bottom: calc(100% - var(--lantern-y) + 44px);
-        transform: translateX(-50%);
-        width: min(340px, calc(100% - 32px));
-        box-sizing: border-box;
-        padding: 14px 18px 12px;
-        border-radius: 12px;
-        background: rgba(27, 27, 58, 0.72);
-        border: 1px solid rgba(232, 160, 122, 0.2);
-        backdrop-filter: blur(6px);
-        -webkit-backdrop-filter: blur(6px);
-        text-align: center;
-        transition: opacity 500ms ease;
-      }
+      /* The prompt floats beside the lantern as a small handwritten caption: no box, nothing over the lantern. */
       .hint {
+        position: absolute;
+        left: var(--hint-x, 50%);
+        top: var(--lantern-y);
         margin: 0;
-        min-height: 1.4em;
-        font-size: 17px;
-        font-weight: 600;
-        line-height: 1.4;
+        width: 140px;
+        transform: translateY(-84px);
+        font-family: var(--hand);
+        font-size: 20px;
+        line-height: 1.2;
         letter-spacing: 0.01em;
+        color: var(--cream);
+        text-shadow: 0 1px 10px rgba(27, 27, 58, 0.95), 0 0 2px rgba(27, 27, 58, 1), 0 0 18px rgba(255, 181, 71, 0.25);
         transition: opacity 260ms ease;
+        will-change: left, top;
       }
+      .hint.left { text-align: right; }
       .hint.fading { opacity: 0; }
+      /* Small pills at the very bottom, clear of the lantern and of where people press. */
       .actions {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: calc(14px + var(--safe-bottom));
         display: flex;
         justify-content: center;
-        gap: 12px;
-        margin-top: 10px;
+        gap: 10px;
       }
-      .actions:empty, .actions[data-empty='true'] { display: none; }
+      .actions[data-empty='true'] { display: none; }
       .btn {
         pointer-events: auto;
-        min-height: 44px;
+        min-height: 40px;
         min-width: 44px;
-        padding: 10px 22px;
-        border-radius: 12px;
-        font: inherit;
-        font-size: 16px;
-        font-weight: 600;
+        padding: 6px 18px;
+        border-radius: 999px;
+        font-family: var(--hand);
+        font-size: 19px;
+        line-height: 1.2;
         cursor: pointer;
         transition: opacity 400ms ease, transform 400ms ease;
       }
@@ -132,9 +137,9 @@
         border: 1px solid rgba(232, 160, 122, 0.2);
       }
       .btn.ghost {
-        background: transparent;
+        background: rgba(27, 27, 58, 0.55);
         color: var(--cream);
-        border: 1px solid rgba(232, 160, 122, 0.35);
+        border: 1px solid rgba(232, 160, 122, 0.3);
       }
       .btn:focus-visible {
         outline: 2px solid var(--cream);
