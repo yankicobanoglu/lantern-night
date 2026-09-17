@@ -19,6 +19,8 @@ export type ShareInput = {
   rising: readonly number[];
   /** The wish to include, or null. */
   wish: string | null;
+  /** Session light arc position, so the image matches the screen. */
+  evening: number;
 };
 
 /** Wait for the two fonts the image uses; drawing goes ahead with fallbacks if they never come. */
@@ -71,6 +73,7 @@ export async function composeShareCanvas(input: ShareInput): Promise<HTMLCanvasE
   const stage = new Container();
   const scene = new Scene(input.renderer, stage, layout, input.seed, 'full');
   scene.setMoonFrame(input.moonFrame);
+  scene.setEvening(input.evening);
   for (const l of input.skyLights) scene.skyLights.add({ seed: l.seed, sky: l.sky, status: l.status });
   for (const p of input.rising) scene.lanterns.spawnRising(Math.max(0.02, Math.min(0.98, p)));
   // A few frames so the halos, bob and flicker take their normal values.

@@ -1,6 +1,7 @@
 import { Container, Sprite, Texture } from 'pixi.js';
 import { radialGlowTexture } from '../engine/lightTextures';
 import type { Layout } from '../engine/layout';
+import type { QualityLevel } from '../engine/quality';
 import { PALETTE } from '../palette';
 import { litFraction, type MoonFrame } from '../ritual/moonPhase';
 import { MOON_SIZE, moonBuffer } from './sprites/moon';
@@ -27,6 +28,11 @@ export class Moon {
     this.sprite.texture = this.frames[frame] ?? this.frames[0]!;
     const lit = litFraction(frame / 8);
     this.halo.alpha = 0.12 + 0.5 * lit;
+  }
+
+  /** No bloom: the halo goes; the disc stays. */
+  setQuality(level: QualityLevel): void {
+    this.halo.visible = level >= 2;
   }
 
   destroy(): void {

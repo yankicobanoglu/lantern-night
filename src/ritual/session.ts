@@ -1,5 +1,5 @@
 import type { Renderer } from 'pixi.js';
-import { STAR_FIRST_SESSION_MAX_S, STAR_INTERVAL_MAX_S, STAR_INTERVAL_MIN_S, WATCH_BUTTONS_MIN_PROGRESS, WATCH_BUTTONS_SKY_FRACTION } from '../config';
+import { LIGHT_ARC_S, STAR_FIRST_SESSION_MAX_S, STAR_INTERVAL_MAX_S, STAR_INTERVAL_MIN_S, WATCH_BUTTONS_MIN_PROGRESS, WATCH_BUTTONS_SKY_FRACTION } from '../config';
 import type { AudioEngine } from '../audio/engine';
 import type { Layout } from '../engine/layout';
 import { systemMotionLevel, type MotionLevel } from '../engine/motion';
@@ -47,6 +47,8 @@ export type SessionDeps = {
   starNow: boolean;
   /** ?install=ios|prompt forces an install path (tests). */
   installForce: 'ios' | 'prompt' | null;
+  /** ?evening=0..1 pins the session light arc (tests, screenshots); null lets it run on the session clock. */
+  evening: number | null;
   /** The captured beforeinstallprompt event, if the browser offered one. */
   installPrompt: () => BeforeInstallPromptEvent | null;
   seed: number;
@@ -85,11 +87,14 @@ export class Session {
   private nextStarIn = Infinity;
   private goodnightAt = 0;
   private installShownThisSession = false;
+  /** Session clock for the light arc, in scene time (speed applies). */
+  private sessionMs = 0;
 
   constructor(private readonly deps: SessionDeps) {
     const { root, scene, audio } = deps;
     this.rng = createRng(deps.seed ^ 0x5bd1e995);
     root.dataset['state'] = 'loading';
+    if (deps.evening !== null) scene.setEvening(deps.evening);
 
     this.hold = new HoldController(deps.canvas, {
       onFill: (fill, holding) => {
@@ -168,7 +173,6 @@ export class Session {
         this.settings.show(this.deps.store.settings, this.motion());
         root.classList.add('overlay-open');
       },
-      onShare: () => this.openShare(null),
     });
     this.mute = new MuteButton(root, (on) => void this.changeSettings({ sound: on }));
     this.moon = new MoonLabel(root, deps.now);
@@ -394,11 +398,11 @@ export class Session {
   }
 
   private shareWish: string | null = null;
-  private shareReturnTo: 'sky' | 'stage' | 'menu' = 'stage';
+  private shareReturnTo: 'sky' | 'stage' = 'stage';
 
   private openShare(wish: string | null): void {
     this.shareWish = wish;
-    this.shareReturnTo = this.skyView.isOpen ? 'sky' : this.machine.state === 'watch' ? 'stage' : 'menu';
+    this.shareReturnTo = this.skyView.isOpen ? 'sky' : 'stage';
     this.skyView.hide();
     this.settings.hide();
     this.deps.root.classList.add('overlay-open');
@@ -411,7 +415,7 @@ export class Session {
       this.skyView.show(this.deps.store.lanterns, this.deps.layout());
     } else {
       this.deps.root.classList.remove('overlay-open');
-      focusNode(this.shareReturnTo === 'stage' ? this.deps.root.querySelector<HTMLElement>('.stage .btn[data-action="share"]') : this.menu.button);
+      focusNode(this.deps.root.querySelector<HTMLElement>('.stage .btn[data-action="share"]') ?? this.menu.button);
     }
   }
 
@@ -425,6 +429,7 @@ export class Session {
       skyLights: scene.skyLights.lights,
       rising: scene.lanterns.rising.map((l) => l.rise.p),
       wish,
+      evening: scene.evening,
     });
   }
 
@@ -515,6 +520,11 @@ export class Session {
     const { scene } = this.deps;
     this.hold.update(dtMs);
     const state: State = this.machine.state;
+    // Session light arc (SPEC section 3): from page open, over LIGHT_ARC_S; a stall never jumps it.
+    if (this.deps.evening === null) {
+      this.sessionMs += Math.min(dtMs, 100) * scene.speed;
+      scene.setEvening(this.sessionMs / (LIGHT_ARC_S * 1000));
+    }
     // Stars only during arrive and watch (SPEC section 3).
     if ((state === 'arrive' || state === 'watch') && !scene.star.active) {
       this.nextStarIn -= (dtMs / 1000) * scene.speed;

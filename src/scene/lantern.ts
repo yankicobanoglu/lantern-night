@@ -1,5 +1,6 @@
 import { Container, Sprite } from 'pixi.js';
 import type { Layout } from '../engine/layout';
+import type { QualityLevel } from '../engine/quality';
 import { radialGlowTexture, streakTexture } from '../engine/lightTextures';
 import { hash01 } from '../engine/rng';
 import type { Wind } from '../engine/wind';
@@ -39,6 +40,8 @@ export class Lantern {
   /** The written text while the lantern is on the shore; cleared on release. */
   wishText: string | null = null;
   readonly rise: RiseState;
+  /** No bloom (quality 1): core and streak off, halo at half. Set by the field. */
+  quality: QualityLevel = 3;
   private frame = 0;
   private flickerAcc = 0;
   private readonly swayPhase: number;
@@ -175,11 +178,14 @@ export class Lantern {
     const cy = this.y * css;
 
     // Halo: about 4 lantern widths on the shore, shrinking to a sky-light halo of ~14 art px.
+    const bloom = this.quality >= 2;
     const haloD = (LANTERN_W * 4 * (1 - p) + 14 * p) * css;
     this.halo.position.set(cx, cy);
     this.halo.width = haloD;
     this.halo.height = haloD;
-    this.halo.alpha = 0.55 * lit * flicker;
+    this.halo.alpha = 0.55 * lit * flicker * (bloom ? 1 : 0.5);
+    this.core.visible = bloom;
+    this.streak.visible = bloom;
 
     const coreD = (w * 1.6 + 2) * css;
     this.core.position.set(cx, cy + (this.stage === 'big' ? 4 * css : 0));
@@ -198,6 +204,11 @@ export class Lantern {
     this.streak.width = LANTERN_W * 2 * css * (1 - 0.5 * p);
     this.streak.height = LANTERN_W * 4 * css * (1 - 0.6 * p);
     this.streak.alpha = 0.4 * lit * overWater * Math.pow(1 - p, 1.5) * flicker;
+  }
+
+  /** Test hook. */
+  get bloom(): boolean {
+    return this.core.visible;
   }
 
   destroy(): void {

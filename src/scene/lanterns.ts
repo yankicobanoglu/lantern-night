@@ -2,6 +2,7 @@ import { Container } from 'pixi.js';
 import { MAX_ACTIVE, REDUCED_MOTION_RISE_FACTOR, RISE_SPEED } from '../config';
 import type { Layout } from '../engine/layout';
 import type { MotionLevel } from '../engine/motion';
+import type { QualityLevel } from '../engine/quality';
 import { WindField } from '../engine/wind';
 import { Lantern, type LanternLayers } from './lantern';
 import type { RiseOptions } from './lanternPhysics';
@@ -24,6 +25,7 @@ export class LanternField {
   /** Existing sky lights, so new sky points spread out. Set by the scene. */
   existingSky: () => readonly SkyPoint[] = () => [];
   motion: MotionLevel = 'full';
+  quality: QualityLevel = 3;
   readonly tex = new LanternTextures();
   private nextSeed: number;
 
@@ -31,6 +33,11 @@ export class LanternField {
     this.wind = new WindField(seed, 4);
     this.nextSeed = (seed * 7919 + 17) >>> 0;
     this.lightLayer.blendMode = 'add';
+  }
+
+  setQuality(level: QualityLevel): void {
+    this.quality = level;
+    for (const l of this.lanterns) l.quality = level;
   }
 
   private get layers(): LanternLayers {
@@ -60,6 +67,7 @@ export class LanternField {
     const existing = this.resting;
     if (existing) return existing;
     const l = new Lantern(this.takeSeed(), this.layout, this.tex, this.layers);
+    l.quality = this.quality;
     this.lanterns.push(l);
     return l;
   }
@@ -77,6 +85,7 @@ export class LanternField {
   spawnRising(progress: number): Lantern {
     if (this.rising.length >= MAX_ACTIVE) this.handOff(this.rising[0]!);
     const l = new Lantern(this.takeSeed(), this.layout, this.tex, this.layers);
+    l.quality = this.quality;
     l.fill = 1;
     l.phase = 'lit';
     this.lanterns.push(l);

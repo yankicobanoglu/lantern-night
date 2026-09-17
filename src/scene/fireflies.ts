@@ -3,6 +3,7 @@ import { FIREFLY_COUNT } from '../config';
 import type { Layout } from '../engine/layout';
 import { radialGlowTexture } from '../engine/lightTextures';
 import type { MotionLevel } from '../engine/motion';
+import type { QualityLevel } from '../engine/quality';
 import { PixelBuffer } from '../engine/pixelBuffer';
 import { createRng, hash01 } from '../engine/rng';
 import { PALETTE } from '../palette';
@@ -20,8 +21,11 @@ export class Fireflies {
   private buf: PixelBuffer;
   private flies: Firefly[] = [];
   private top = 0;
+  private motion: MotionLevel;
+  private quality: QualityLevel = 3;
 
   constructor(private layout: Layout, private readonly seed: number, motion: MotionLevel) {
+    this.motion = motion;
     this.buf = new PixelBuffer(1, 1);
     this.sprite = new Sprite();
     this.light.blendMode = 'add';
@@ -30,6 +34,7 @@ export class Fireflies {
 
   build(layout: Layout, motion: MotionLevel): void {
     this.layout = layout;
+    this.motion = motion;
     for (const f of this.flies) f.halo.destroy();
     this.flies = [];
     this.buf.destroy();
@@ -39,7 +44,9 @@ export class Fireflies {
     this.sprite.position.set(0, this.top);
 
     const rng = createRng(this.seed + 500);
-    const count = motion === 'gentle' ? Math.ceil(FIREFLY_COUNT / 2) : FIREFLY_COUNT;
+    // Fewer particles (quality 2 and below) uses the gentle count; the halos go too.
+    const count = motion === 'gentle' || this.quality < 3 ? Math.ceil(FIREFLY_COUNT / 2) : FIREFLY_COUNT;
+    this.light.visible = this.quality >= 3;
     const tex = radialGlowTexture(64, PALETTE.firefly, 0.8);
     for (let i = 0; i < count; i++) {
       // Keep them clear of the lantern's spot and mostly near the reeds on both sides.
@@ -52,6 +59,17 @@ export class Fireflies {
       this.light.addChild(halo);
       this.flies.push({ x, y, vx: 0, vy: 0, phase: rng.next() * 10, period: 3.5 + rng.next() * 3, halo });
     }
+  }
+
+  setQuality(level: QualityLevel): void {
+    if (level === this.quality) return;
+    this.quality = level;
+    this.build(this.layout, this.motion);
+  }
+
+  /** Test hook. */
+  report(): { count: number; halos: boolean } {
+    return { count: this.flies.length, halos: this.light.visible };
   }
 
   /** Brightness envelope 0–1: on for ~1.5 s of each period, soft in and out. */

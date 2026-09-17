@@ -6,6 +6,7 @@ import { Pipeline } from '../engine/pipeline';
 import { PixelBuffer } from '../engine/pixelBuffer';
 import { hash01 } from '../engine/rng';
 import { SlowTick } from '../engine/ticker';
+import type { QualityLevel } from '../engine/quality';
 import { PALETTE } from '../palette';
 import type { MoonFrame } from '../ritual/moonPhase';
 import { Cozy } from './cozy';
@@ -16,7 +17,7 @@ import { LanternField } from './lanterns';
 import { Moon } from './moon';
 import { drawShore } from './shore';
 import { ShootingStar } from './shootingStar';
-import { drawSky, type Star } from './sky';
+import { bandBoundaries, drawSkyBands, drawStars, type Star } from './sky';
 import { SkyLights } from './skyLights';
 
 export class Scene {
@@ -29,6 +30,11 @@ export class Scene {
   readonly star: ShootingStar;
   /** Time multiplier for the animated parts (test hook; 1 in normal use). */
   speed = 1;
+  /** Adaptive quality level (SPEC section 8); applied by setQuality. */
+  quality: QualityLevel = 3;
+  /** Session light arc 0–1 (SPEC section 3). */
+  evening = 0;
+  private skyBoundsKey = '';
   private lake: Lake;
   private staticBuf: PixelBuffer;
   private staticSprite: Sprite;
@@ -81,7 +87,9 @@ export class Scene {
     this.shoreBuf.destroy();
 
     this.staticBuf = new PixelBuffer(layout.width, layout.hillsEnd);
-    this.stars = drawSky(this.staticBuf, layout, this.seed);
+    drawSkyBands(this.staticBuf, layout, this.evening);
+    this.skyBoundsKey = bandBoundaries(layout.horizon, this.evening).join(',');
+    this.stars = drawStars(this.staticBuf, layout, this.seed);
     const features = drawHills(this.staticBuf, layout, this.seed);
     this.windows = features.windows;
     this.cozy.build(layout, features.windows, features.chimneys);
@@ -97,6 +105,29 @@ export class Scene {
 
     this.moon.place(layout);
     this.slowTick(this.slow.tick);
+  }
+
+  /** Session light arc: redraw the sky only when a band boundary actually moves (every few seconds). */
+  setEvening(evening: number): void {
+    this.evening = Math.max(0, Math.min(1, evening));
+    const key = bandBoundaries(this.layout.horizon, this.evening).join(',');
+    if (key === this.skyBoundsKey) return;
+    this.skyBoundsKey = key;
+    this.staticBuf.clear();
+    drawSkyBands(this.staticBuf, this.layout, this.evening);
+    drawStars(this.staticBuf, this.layout, this.seed);
+    drawHills(this.staticBuf, this.layout, this.seed);
+    this.staticBuf.upload();
+  }
+
+  /** Adaptive quality (SPEC section 8): 3 full, 2 fewer particles, 1 no bloom. */
+  setQuality(level: QualityLevel): void {
+    this.quality = level;
+    this.skyLights.setQuality(level);
+    this.fireflies.setQuality(level);
+    this.cozy.setQuality(level);
+    this.moon.setQuality(level);
+    this.lanterns.setQuality(level);
   }
 
   /** Settings or the system changed the motion level. */

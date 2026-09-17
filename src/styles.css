@@ -99,8 +99,8 @@ button {
   line-height: 1.2;
   cursor: pointer;
   transition:
-    opacity 400ms ease,
-    transform 400ms ease,
+    opacity 400ms var(--ease),
+    transform 400ms var(--ease),
     background-color 300ms ease;
   -webkit-tap-highlight-color: transparent;
 }
@@ -371,7 +371,7 @@ textarea:focus-visible {
     0 1px 10px rgba(27, 27, 58, 0.95),
     0 0 2px rgba(27, 27, 58, 1),
     0 0 18px rgba(255, 181, 71, 0.25);
-  transition: opacity 260ms ease;
+  transition: opacity 400ms var(--ease);
   will-change: left, top;
 }
 .hint {
@@ -391,7 +391,7 @@ textarea:focus-visible {
   font-size: 1.1rem;
   color: var(--glow);
   opacity: 0;
-  transition: opacity 500ms ease;
+  transition: opacity 500ms var(--ease);
 }
 .wish.left {
   text-align: right;
@@ -483,7 +483,7 @@ textarea:focus-visible {
   cursor: pointer;
   display: grid;
   place-items: center;
-  transition: opacity 400ms ease;
+  transition: opacity 400ms var(--ease);
 }
 .corner[hidden] {
   display: none;
@@ -530,9 +530,9 @@ textarea:focus-visible {
   transform: translateY(-4px);
   visibility: hidden;
   transition:
-    opacity 300ms ease,
-    transform 300ms ease,
-    visibility 0s linear 300ms;
+    opacity 400ms var(--ease),
+    transform 400ms var(--ease),
+    visibility 0s linear 400ms;
 }
 .menu-sheet.on {
   opacity: 1;
@@ -683,7 +683,7 @@ textarea:focus-visible {
   position: relative;
   cursor: pointer;
   padding: 0;
-  transition: background-color 300ms ease;
+  transition: background-color 400ms var(--ease);
 }
 .switch::after {
   content: '';
@@ -694,7 +694,7 @@ textarea:focus-visible {
   height: 22px;
   border-radius: 50%;
   background: var(--cream);
-  transition: transform 300ms var(--ease);
+  transition: transform 400ms var(--ease);
 }
 .switch[aria-checked='true'] {
   background: rgba(255, 181, 71, 0.6);
@@ -751,7 +751,7 @@ textarea:focus-visible {
   border: 1px solid var(--panel-border);
   background: var(--night);
   image-rendering: auto;
-  transition: opacity 300ms ease;
+  transition: opacity 400ms var(--ease);
 }
 .share-preview:not([src]) {
   opacity: 0.4;
@@ -778,7 +778,7 @@ textarea:focus-visible {
   opacity: 0;
   visibility: hidden;
   transition:
-    opacity 400ms ease,
+    opacity 400ms var(--ease),
     visibility 0s linear 400ms;
 }
 .install.on {
@@ -816,8 +816,8 @@ textarea:focus-visible {
   opacity: 0;
   visibility: hidden;
   transition:
-    opacity 300ms ease,
-    visibility 0s linear 300ms;
+    opacity 400ms var(--ease),
+    visibility 0s linear 400ms;
 }
 .moon-label.on {
   opacity: 1;
@@ -857,7 +857,7 @@ textarea:focus-visible {
     0 1px 10px rgba(27, 27, 58, 0.95),
     0 0 18px rgba(255, 181, 71, 0.35);
   opacity: 0;
-  transition: opacity 400ms ease;
+  transition: opacity 400ms var(--ease);
 }
 .star-line.on {
   opacity: 1;
@@ -900,7 +900,7 @@ textarea:focus-visible {
   opacity: 0;
   visibility: hidden;
   transition:
-    opacity 400ms ease,
+    opacity 400ms var(--ease),
     visibility 0s linear 400ms;
 }
 .toast.on {

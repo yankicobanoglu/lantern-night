@@ -110,20 +110,6 @@ test.describe('share image', () => {
     writeFileSync(join(OUT_DIR, `${testInfo.project.name}-share-image.png`), file);
   });
 
-  test('from the corner menu, at any time', async ({ page }) => {
-    await openRitual(page, QUIET);
-    await page.getByRole('button', { name: 'Menu' }).click();
-    await page.getByRole('menuitem', { name: 'Share my sky' }).click();
-    await expect(page.locator('.share')).toBeVisible();
-    await expect(page.locator('.share-preview')).toHaveAttribute('src', /^data:image\/png/, { timeout: 15_000 });
-    await expect(page.getByRole('switch', { name: 'Include my wish' })).toBeHidden();
-    // The file is ready before the tap, so iOS can open its sheet inside the gesture.
-    await page.locator('.share').getByRole('button', { name: 'Close' }).click();
-    await expect(page.locator('.share')).toBeHidden();
-    expect(await page.evaluate(() => window.__lantern!.state())).toBe('arrive');
-    await expect(page.locator('.arrive')).toBeVisible();
-  });
-
   test('from the watch state, with the wish just released', async ({ page }) => {
     await openRitual(page, QUIET);
     await foldLantern(page, 'I trust that it works out');

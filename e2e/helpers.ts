@@ -4,8 +4,13 @@ import { join } from 'node:path';
 
 export const OUT_DIR = join(process.cwd(), 'e2e', 'output');
 
+/** Tests pin the quality level unless they ask for something else: headless GPUs are slow and the governor would otherwise step down mid-test. */
+export function withQuality(query: string): string {
+  return query.includes('quality=') ? query : `${query}&quality=3`;
+}
+
 export async function openScene(page: Page, query: string): Promise<void> {
-  await page.goto(`?${query}`);
+  await page.goto(`?${withQuality(query)}`);
   await page.waitForSelector('body[data-ready="true"]', { timeout: 30_000 });
   // Let the slow tick and halo settle.
   await page.waitForTimeout(400);
@@ -78,7 +83,7 @@ export function sampleRect(page: Page, x: number, y: number, w: number, h: numbe
 
 /** Open the app and wait for the arrive screen. */
 export async function openRitual(page: Page, query: string): Promise<void> {
-  await page.goto(`?${query}`);
+  await page.goto(`?${withQuality(query)}`);
   await page.waitForSelector('body[data-ready="true"]', { timeout: 30_000 });
   await page.waitForSelector('#ui[data-state="arrive"]', { timeout: 10_000 });
   await page.waitForTimeout(300);

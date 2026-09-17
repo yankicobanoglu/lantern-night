@@ -2,6 +2,7 @@ import { Container, Sprite } from 'pixi.js';
 import type { Layout } from '../engine/layout';
 import { radialGlowTexture, wispTexture } from '../engine/lightTextures';
 import { PixelBuffer, type PixelMap } from '../engine/pixelBuffer';
+import type { QualityLevel } from '../engine/quality';
 import { hash01 } from '../engine/rng';
 import { PALETTE } from '../palette';
 import type { Chimney, Window } from './hills';
@@ -37,6 +38,7 @@ export class Cozy {
   private wisps: Wisp[] = [];
   private chimneys: Chimney[] = [];
   private boat = { x: 0, y: 0 };
+  private quality: QualityLevel = 3;
 
   constructor(private layout: Layout, private readonly seed: number) {
     this.smokeSprite = new Sprite();
@@ -104,6 +106,24 @@ export class Cozy {
         w,
       });
     }
+    this.applyQuality();
+  }
+
+  /** Fewer particles: no mist. No bloom: no window or boat glow either. */
+  setQuality(level: QualityLevel): void {
+    this.quality = level;
+    this.applyQuality();
+  }
+
+  private applyQuality(): void {
+    for (const w of this.wisps) w.sprite.visible = this.quality >= 3;
+    for (const g of this.windowGlows) g.visible = this.quality >= 2;
+    if (this.boatGlow) this.boatGlow.visible = this.quality >= 2;
+  }
+
+  /** Test hook. */
+  report(): { wisps: boolean; windowGlows: boolean } {
+    return { wisps: this.wisps.every((w) => w.sprite.visible), windowGlows: this.windowGlows.every((g) => g.visible) };
   }
 
   /** Per frame: mist drifts, window glow breathes. */

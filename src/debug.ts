@@ -1,6 +1,7 @@
 import type { Application } from 'pixi.js';
 import type { AudioEngine, AudioState } from './audio/engine';
 import type { Layout } from './engine/layout';
+import { QUALITY_NAMES, type QualityGovernor, type QualityLevel } from './engine/quality';
 import type { FrameStats } from './engine/ticker';
 import type { Session } from './ritual/session';
 import { moonAge, moonFrame, type MoonFrame } from './ritual/moonPhase';
@@ -25,6 +26,10 @@ export type DebugOptions = {
   starNow: boolean;
   /** ?install=ios|prompt forces an install hint path. */
   installForce: 'ios' | 'prompt' | null;
+  /** ?quality=1|2|3 pins the adaptive quality level (the governor is off). */
+  quality: QualityLevel | null;
+  /** ?evening=0..1 pins the session light arc. */
+  evening: number | null;
 };
 
 export function readDebugOptions(search: string): DebugOptions {
@@ -36,6 +41,8 @@ export function readDebugOptions(search: string): DebugOptions {
   const seedParam = params.get('seed');
   const count = (key: string, max: number): number => Math.max(0, Math.min(max, Number(params.get(key) ?? 0) || 0));
   const motion = params.get('motion');
+  const quality = params.get('quality');
+  const evening = params.has('evening') ? Number(params.get('evening')) : NaN;
   return {
     now: fixed && !Number.isNaN(fixed.getTime()) ? () => fixed : () => new Date(),
     forcedFrame: forced,
@@ -46,6 +53,8 @@ export function readDebugOptions(search: string): DebugOptions {
     motion: motion === 'gentle' || motion === 'full' ? motion : null,
     starNow: params.get('star') === 'now',
     installForce: params.get('install') === 'ios' ? 'ios' : params.get('install') === 'prompt' ? 'prompt' : null,
+    quality: quality !== null && /^[123]$/.test(quality) ? (Number(quality) as QualityLevel) : null,
+    evening: Number.isNaN(evening) ? null : Math.max(0, Math.min(1, evening)),
   };
 }
 
@@ -86,6 +95,20 @@ export type LanternDebug = {
   shareImage: (wish?: string | null) => Promise<string>;
   /** Install hint: the detected path and how often the hint has been shown. */
   install: () => { path: string; hintCount: number };
+  /** Adaptive quality: the level and what each subsystem is doing about it. */
+  quality: () => {
+    level: number;
+    name: string;
+    skyHalos: boolean;
+    fireflies: { count: number; halos: boolean };
+    cozy: { wisps: boolean; windowGlows: boolean };
+    moonHalo: boolean;
+    lanternBloom: boolean[];
+  };
+  /** Pin a quality level now (the governor stops). */
+  setQuality: (level: QualityLevel) => void;
+  /** Session light arc position 0–1. */
+  evening: () => number;
   /** The live scene, for manual inspection in dev. */
   scene: Scene;
   ready: boolean;
@@ -105,6 +128,7 @@ export function installDebug(
   audio: AudioEngine,
   stats: FrameStats,
   cpu: FrameStats,
+  governor: QualityGovernor,
   getLayout: () => Layout,
 ): void {
   const readPixel = (p: Uint8ClampedArray | Uint8Array, w: number, x: number, y: number): number => {
@@ -159,17 +183,31 @@ export function installDebug(
     audio: () => audio.state,
     shareImage: async (wish = null) => (await session.renderShare(wish)).toDataURL('image/png'),
     install: () => ({ path: session.installPath(), hintCount: session.installHintCount() }),
+    quality: () => ({
+      level: scene.quality,
+      name: QUALITY_NAMES[scene.quality],
+      skyHalos: scene.skyLights.halos.visible,
+      fireflies: scene.fireflies.report(),
+      cozy: scene.cozy.report(),
+      moonHalo: scene.moon.halo.visible,
+      lanternBloom: scene.lanterns.lanterns.map((l) => l.bloom),
+    }),
+    setQuality: (level) => {
+      governor.set(level);
+      scene.setQuality(level);
+    },
+    evening: () => scene.evening,
     scene,
     ready: false,
   };
 }
 
-export function mountFpsOverlay(stats: FrameStats, cpu: FrameStats): void {
+export function mountFpsOverlay(stats: FrameStats, cpu: FrameStats, governor: QualityGovernor): void {
   const el = document.createElement('div');
   el.style.cssText =
     'position:fixed;top:8px;left:8px;padding:4px 8px;font:12px monospace;color:#fff4d6;background:rgba(27,27,58,.72);border-radius:6px;z-index:10;pointer-events:none';
   document.body.appendChild(el);
   setInterval(() => {
-    el.textContent = `${stats.fps.toFixed(0)} fps  frame ${stats.avgMs.toFixed(1)} ms  cpu ${cpu.avgMs.toFixed(2)} ms (p95 ${cpu.p95Ms.toFixed(2)})`;
+    el.textContent = `${stats.fps.toFixed(0)} fps  frame ${stats.avgMs.toFixed(1)} ms  cpu ${cpu.avgMs.toFixed(2)} ms (p95 ${cpu.p95Ms.toFixed(2)})  q${governor.level} ${QUALITY_NAMES[governor.level]}`;
   }, 500);
 }

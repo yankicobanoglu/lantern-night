@@ -84,7 +84,7 @@ e2e/access.spec.ts                keyboard-only, reduced motion, audio starts af
 ## Review fixes after the iPhone check (2026-09-17)
 
 - Share opened a viewer instead of the iOS share sheet: iOS only opens its sheet inside the tap, and the image was still being turned into a file after the tap. The file is now prepared when the preview renders, and the tap calls the share API synchronously.
-- "Share my sky" is now also a corner-menu item, reachable at any time (it was only in Your sky and the watch state).
+- "Share my sky" was briefly a corner-menu item too; removed again on review. It lives in Your sky and the watch state, and the menu holds only Your sky and Settings (section 3).
 - Wind level lowered (0.42 → 0.30, gust depth 0.16 → 0.11).
 - Home-screen icon redrawn: a 32×32 dusk scene with a glowing lantern over the lake and the moon; the render extends the edge rows so no frame shows at 180/192/512.
 - Empty band at the bottom in a home-screen web app: iOS reports the wrong height at launch and fires no resize event, so the canvas kept that height. The ticker now checks the viewport size every frame and resizes when it changes.

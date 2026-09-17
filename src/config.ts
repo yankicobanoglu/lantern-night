@@ -41,6 +41,9 @@ export const MAX_SKY = 1000;
 export const NEXT_LANTERN_SKY_FRACTION = 0.5;
 export const NEXT_LANTERN_MIN_PROGRESS = 0.85;
 
+/** Session light arc (SPEC section 3, P1): the horizon eases from apricot to plum over this long, from page open. */
+export const LIGHT_ARC_S = 180;
+
 /** Fireflies along the shore; halved under reduced motion. */
 export const FIREFLY_COUNT = 14;
 

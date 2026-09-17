@@ -3,6 +3,7 @@ import { MAX_SKY } from '../config';
 import type { Layout } from '../engine/layout';
 import { radialGlowTexture } from '../engine/lightTextures';
 import { PixelBuffer } from '../engine/pixelBuffer';
+import type { QualityLevel } from '../engine/quality';
 import { hash01 } from '../engine/rng';
 import { PALETTE } from '../palette';
 import type { SkyPoint } from './skyPoint';
@@ -50,6 +51,11 @@ export class SkyLights {
     this.halos.addParticle(p);
     this.placeHalo(this.lights.length - 1, 0);
     this.drawTick(this.lastTick);
+  }
+
+  /** Below full quality the additive halos go; the ≥ 2×2 warm dots stay legible on their own. */
+  setQuality(level: QualityLevel): void {
+    this.halos.visible = level >= 3;
   }
 
   /** A return changed a stored lantern's status: brighter and larger when it came true, dimmer when let go. */
