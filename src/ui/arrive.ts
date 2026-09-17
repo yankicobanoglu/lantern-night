@@ -1,6 +1,7 @@
 import { arriveLine, COPY, moonBanner } from '../ritual/copy';
 import type { MoonKind } from '../ritual/moonPhase';
 import { button, el } from './dom';
+import { focusFirst } from './focus';
 
 /** Arrive screen (SPEC section 3, step 1): title, welcome line, moon banner, Begin. */
 export class ArriveScreen {
@@ -26,6 +27,7 @@ export class ArriveScreen {
     this.banner.textContent = b ?? '';
     this.node.classList.add('on');
     this.title.classList.add('on');
+    focusFirst(this.node);
   }
 
   hide(): void {

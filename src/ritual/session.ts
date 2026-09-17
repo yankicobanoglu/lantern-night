@@ -1,21 +1,29 @@
+import type { Renderer } from 'pixi.js';
 import { STAR_FIRST_SESSION_MAX_S, STAR_INTERVAL_MAX_S, STAR_INTERVAL_MIN_S, WATCH_BUTTONS_MIN_PROGRESS, WATCH_BUTTONS_SKY_FRACTION } from '../config';
+import type { AudioEngine } from '../audio/engine';
 import type { Layout } from '../engine/layout';
 import { systemMotionLevel, type MotionLevel } from '../engine/motion';
 import { createRng } from '../engine/rng';
 import type { Lantern as SceneLantern } from '../scene/lantern';
 import type { Scene } from '../scene/scene';
 import { pickStarPath, type StarAvoid } from '../scene/shootingStar';
+import { canvasToBlob, composeShareCanvas, shareFileName } from '../share/compose';
+import { shareOrDownload } from '../share/share';
 import { backupFileName, parseBackup, serializeBackup } from '../store/backup';
 import type { Store } from '../store/store';
 import type { Lantern, Settings } from '../store/types';
 import { ArriveScreen } from '../ui/arrive';
 import { el } from '../ui/dom';
+import { focusNode } from '../ui/focus';
+import { detectInstall, InstallHint, readInstallEnv, shouldShowInstallHint, type BeforeInstallPromptEvent, type InstallPath } from '../ui/install';
 import { IntentionScreen } from '../ui/intention';
 import { LightUi } from '../ui/lightUi';
 import { Menu } from '../ui/menu';
 import { MoonLabel } from '../ui/moonLabel';
+import { MuteButton } from '../ui/mute';
 import { ReturnScreen, type ReturnAnswer } from '../ui/returnCard';
 import { SettingsSheet } from '../ui/settings';
+import { ShareSheet } from '../ui/shareSheet';
 import { SkyView } from '../ui/skyView';
 import { StarUi } from '../ui/starUi';
 import { Toast } from '../ui/toast';
@@ -29,19 +37,25 @@ export type SessionDeps = {
   canvas: HTMLCanvasElement;
   scene: Scene;
   store: Store;
+  audio: AudioEngine;
+  renderer: Renderer;
   layout: () => Layout;
   now: () => Date;
   /** ?motion= override for tests. */
   motionOverride: MotionLevel | null;
   /** ?star=now: the first shooting star comes right away. */
   starNow: boolean;
+  /** ?install=ios|prompt forces an install path (tests). */
+  installForce: 'ios' | 'prompt' | null;
+  /** The captured beforeinstallprompt event, if the browser offered one. */
+  installPrompt: () => BeforeInstallPromptEvent | null;
   seed: number;
 };
 
 /**
  * The ritual (SPEC section 3): wires the state machine to the store, the
- * scene and the DOM screens. Overlays (Your sky, Settings, moon label,
- * shooting star) sit beside the state and never change it.
+ * scene, the soundscape and the DOM screens. Overlays (Your sky, Settings,
+ * Share, moon label, shooting star) sit beside the state and never change it.
  */
 export class Session {
   readonly machine = new Machine();
@@ -49,6 +63,8 @@ export class Session {
   mode: Mode = 'wish';
   /** The lantern released most recently (for the watch rule and the caption). */
   released: SceneLantern | null = null;
+  /** The wish text released most recently (wish mode only), offered to the share sheet. */
+  private lastWish: string | null = null;
   private watchShown = false;
   private readonly arrive: ArriveScreen;
   private readonly returnCard: ReturnScreen;
@@ -56,18 +72,22 @@ export class Session {
   private readonly lightUi: LightUi;
   private readonly skyView: SkyView;
   private readonly settings: SettingsSheet;
+  private readonly share: ShareSheet;
   readonly menu: Menu;
+  private readonly mute: MuteButton;
   private readonly moon: MoonLabel;
   private readonly toast: Toast;
   private readonly starUi: StarUi;
+  private readonly installHint: InstallHint;
   private readonly veil: HTMLElement;
   private readonly goodnightLine: HTMLElement;
   private readonly rng;
   private nextStarIn = Infinity;
   private goodnightAt = 0;
+  private installShownThisSession = false;
 
   constructor(private readonly deps: SessionDeps) {
-    const { root, scene } = deps;
+    const { root, scene, audio } = deps;
     this.rng = createRng(deps.seed ^ 0x5bd1e995);
     root.dataset['state'] = 'loading';
 
@@ -76,6 +96,7 @@ export class Session {
         const l = scene.lanterns.resting;
         if (l) l.fill = fill;
         this.lightUi.holding(holding);
+        audio.setFlame(fill);
       },
       onLit: () => {
         const l = scene.lanterns.resting;
@@ -84,6 +105,7 @@ export class Session {
           l.phase = 'lit';
         }
         this.lightUi.lit();
+        audio.lit();
       },
       onRelease: () => void this.release(),
     });
@@ -93,6 +115,7 @@ export class Session {
       onRelease: () => this.hold.releaseNow(),
       onAnother: () => this.lightAnother(),
       onGoodnight: () => this.goodnight(),
+      onShare: () => this.openShare(this.lastWish),
     });
     this.arrive = new ArriveScreen(root, () => this.begin());
     this.returnCard = new ReturnScreen(
@@ -101,13 +124,24 @@ export class Session {
       () => this.showIntention(),
     );
     this.intention = new IntentionScreen(root, (mode, text) => this.fold(mode, text));
-    this.veil = el('div', { class: 'veil', 'aria-hidden': 'true' });
+    this.veil = el('div', { class: 'veil', role: 'button', tabindex: -1, 'aria-label': 'Back to the start' });
     this.goodnightLine = el('p', { class: 'goodnight-line', role: 'status', 'aria-live': 'polite' });
-    this.veil.addEventListener('click', () => {
+    const leaveGoodnight = (): void => {
       if (this.machine.state === 'goodnight' && performance.now() >= this.goodnightAt) this.backToArrive();
+    };
+    this.veil.addEventListener('click', leaveGoodnight);
+    this.veil.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        leaveGoodnight();
+      }
     });
     root.append(this.veil, this.goodnightLine);
-    this.skyView = new SkyView(root, () => this.closeOverlays());
+    this.skyView = new SkyView(
+      root,
+      () => this.closeOverlays(),
+      () => this.openShare(this.skyView.selectedWish),
+    );
     this.settings = new SettingsSheet(root, {
       onChange: (patch) => void this.changeSettings(patch),
       onSave: () => void this.saveBackup(),
@@ -115,22 +149,46 @@ export class Session {
       onClear: () => void this.clearSky(),
       onClose: () => this.closeOverlays(),
     });
+    this.share = new ShareSheet(root, {
+      render: (includeWish) => this.renderShare(includeWish ? this.shareWish : null),
+      share: (canvas) => this.shareCanvas(canvas),
+      onClose: () => this.closeShare(),
+    });
     this.menu = new Menu(root, {
       onSky: () => {
         this.settings.hide();
+        this.share.hide();
         this.skyView.show(this.deps.store.lanterns, this.deps.layout());
         root.classList.add('overlay-open');
       },
       onSettings: () => {
         this.skyView.hide();
+        this.share.hide();
         this.settings.show(this.deps.store.settings, this.motion());
         root.classList.add('overlay-open');
       },
     });
+    this.mute = new MuteButton(root, (on) => void this.changeSettings({ sound: on }));
     this.moon = new MoonLabel(root, deps.now);
     this.toast = new Toast(root);
     this.starUi = new StarUi(root, (x, y) => this.tapStar(x, y));
+    this.installHint = new InstallHint(root, () => void this.promptInstall());
     this.moon.place(deps.layout());
+
+    // Escape closes whatever is on top: the share sheet, an overlay, the menu, the moon label.
+    root.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (this.share.isOpen) this.closeShare();
+      else if (this.skyView.isOpen || this.settings.isOpen) {
+        this.closeOverlays();
+        focusNode(this.menu.button);
+      } else if (this.menu.isOpen) {
+        this.menu.toggle(false);
+        focusNode(this.menu.button);
+      } else if (this.installHint.isOpen) this.installHint.hide();
+      else return;
+      e.preventDefault();
+    });
 
     this.machine.onChange((t) => {
       root.dataset['state'] = t.to;
@@ -151,6 +209,9 @@ export class Session {
     const m = this.motion();
     this.deps.scene.setMotion(m);
     this.lightUi.setMotion(m);
+    this.deps.audio.setEnabled(s.sound);
+    this.mute.set(s.sound);
+    this.settings.setSound(s.sound);
   }
 
   private async changeSettings(patch: Partial<Settings>): Promise<void> {
@@ -222,24 +283,42 @@ export class Session {
   }
 
   private async release(): Promise<void> {
-    const { scene, store } = this.deps;
+    const { scene, store, audio } = this.deps;
     const l = scene.lanterns.resting;
     if (!l || !scene.lanterns.release(l) || !l.sky) return;
     this.machine.go('release');
     this.released = l;
     this.watchShown = false;
     this.lightUi.released(this.mode);
+    audio.flameOff();
+    audio.chime();
     this.machine.go('watch');
+    this.lastWish = this.mode === 'wish' ? l.wishText : null;
     if (this.mode === 'wish') {
       try {
         const record = await store.add({ text: l.wishText ?? '', sky: l.sky, seed: l.seed, now: this.deps.now() });
         l.storedId = record.id;
+        void this.requestPersistence();
       } catch {
         this.toast.show(COPY.system.storageUnavailable, 8000);
       }
     }
     // Let-go text is never stored (SPEC section 6): drop it as soon as the lantern is on its way.
     l.wishText = null;
+  }
+
+  /** SPEC section 6: ask the browser to keep the sky after the first lantern is saved; record the answer once. */
+  private async requestPersistence(): Promise<void> {
+    const { store } = this.deps;
+    if (store.settings.persistGranted !== null) return;
+    const persist = navigator.storage?.persist;
+    if (typeof persist !== 'function') return;
+    try {
+      const granted = await navigator.storage.persist();
+      await store.saveSettings({ persistGranted: granted });
+    } catch {
+      /* unsupported or refused: leave null so we can ask again another night */
+    }
   }
 
   /** The released lantern is well on its way: above the middle of the sky band, or already small. */
@@ -250,17 +329,20 @@ export class Session {
   private lightAnother(): void {
     if (this.machine.state !== 'watch') return;
     this.released = null;
+    this.installHint.hide();
     this.showIntention();
   }
 
   private goodnight(): void {
     if (!this.machine.go('goodnight')) return;
     this.lightUi.hide();
+    this.installHint.hide();
     this.released = null;
     this.goodnightLine.textContent = this.mode === 'wish' ? COPY.goodnight.wish : COPY.goodnight.letGo;
     this.veil.classList.add('on');
     this.goodnightLine.classList.add('on');
     this.goodnightAt = performance.now() + 1500;
+    focusNode(this.veil);
   }
 
   private backToArrive(): void {
@@ -270,12 +352,83 @@ export class Session {
     this.showArrive();
   }
 
+  // ---------- Install hint ----------
+
+  /** Which hint applies right now (forced in tests). */
+  installPath(): InstallPath {
+    if (this.deps.installForce) return this.deps.installForce;
+    return detectInstall(readInstallEnv(this.deps.installPrompt() !== null));
+  }
+
+  /** Right after the first lantern has risen (SPEC section 4): first visit, then the third. */
+  private maybeShowInstallHint(): void {
+    if (this.installShownThisSession) return;
+    const { store } = this.deps;
+    if (!shouldShowInstallHint(store.settings.sessions, store.settings.installHintCount)) return;
+    const path = this.installPath();
+    if (path !== 'ios' && path !== 'prompt') return;
+    this.installShownThisSession = true;
+    this.installHint.show(path);
+    void store.saveSettings({ installHintCount: store.settings.installHintCount + 1 }).catch(() => undefined);
+  }
+
+  private async promptInstall(): Promise<void> {
+    const ev = this.deps.installPrompt();
+    if (!ev) return;
+    try {
+      await ev.prompt();
+    } catch {
+      /* the browser decided not to show it */
+    }
+  }
+
   // ---------- Overlays ----------
 
   private closeOverlays(): void {
     this.skyView.hide();
     this.settings.hide();
+    this.share.hide();
     this.deps.root.classList.remove('overlay-open');
+  }
+
+  private shareWish: string | null = null;
+  private shareReturnTo: 'sky' | 'stage' = 'stage';
+
+  private openShare(wish: string | null): void {
+    this.shareWish = wish;
+    this.shareReturnTo = this.skyView.isOpen ? 'sky' : 'stage';
+    this.skyView.hide();
+    this.settings.hide();
+    this.deps.root.classList.add('overlay-open');
+    this.share.open(wish);
+  }
+
+  private closeShare(): void {
+    this.share.hide();
+    if (this.shareReturnTo === 'sky') {
+      this.skyView.show(this.deps.store.lanterns, this.deps.layout());
+    } else {
+      this.deps.root.classList.remove('overlay-open');
+      focusNode(this.deps.root.querySelector<HTMLElement>('.stage .btn[data-action="share"]'));
+    }
+  }
+
+  /** Compose the share image for tonight's sky (SPEC section 9). */
+  renderShare(wish: string | null): Promise<HTMLCanvasElement> {
+    const { scene, renderer } = this.deps;
+    return composeShareCanvas({
+      renderer,
+      seed: scene.seed,
+      moonFrame: scene.moon.currentFrame,
+      skyLights: scene.skyLights.lights,
+      rising: scene.lanterns.rising.map((l) => l.rise.p),
+      wish,
+    });
+  }
+
+  private async shareCanvas(canvas: HTMLCanvasElement): Promise<void> {
+    const blob = await canvasToBlob(canvas);
+    await shareOrDownload(blob, shareFileName(this.deps.now()), COPY.title);
   }
 
   private followLantern(): void {
@@ -290,27 +443,9 @@ export class Session {
     const at = now();
     const text = serializeBackup(store.lanterns, store.settings, at);
     const name = backupFileName(at);
-    const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-    let shared = false;
-    if (typeof File !== 'undefined' && nav.canShare && nav.share) {
-      const file = new File([text], name, { type: 'application/json' });
-      if (nav.canShare({ files: [file] })) {
-        try {
-          await nav.share({ files: [file], title: COPY.title });
-          shared = true;
-        } catch (e) {
-          if ((e as { name?: string }).name === 'AbortError') return;
-        }
-      }
-    }
-    if (!shared) {
-      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-      const a = el('a', { href: url, download: name });
-      document.body.append(a);
-      a.click();
-      a.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    }
+    const blob = new Blob([text], { type: 'application/json' });
+    const outcome = await shareOrDownload(blob, name, COPY.title);
+    if (outcome === 'cancelled') return;
     await store.saveSettings({ lastBackupAt: at.toISOString() }).catch(() => undefined);
     this.toast.show(COPY.settings.saved);
   }
@@ -340,7 +475,7 @@ export class Session {
   // ---------- Shooting stars ----------
 
   private trySpawnStar(): void {
-    const { scene, layout } = this.deps;
+    const { scene, layout, audio } = this.deps;
     const L = layout();
     const css = L.cssScale;
     const avoid: StarAvoid[] = scene.lanterns.lanterns.filter((l) => l.phase !== 'done').map((l) => ({ x: l.x * css, y: l.y * css, r: 60 }));
@@ -350,7 +485,7 @@ export class Session {
       return;
     }
     scene.star.spawn(path);
-    // Sound hook (M4): a faint shimmer on spawn when sound is on.
+    audio.shimmer();
     this.nextStarIn = this.rng.range(STAR_INTERVAL_MIN_S, STAR_INTERVAL_MAX_S);
   }
 
@@ -360,6 +495,7 @@ export class Session {
     const path = pickStarPath(L, this.rng.int(1, 1 << 30), []);
     if (!path) return false;
     this.deps.scene.star.spawn(path);
+    this.deps.audio.shimmer();
     return true;
   }
 
@@ -392,6 +528,7 @@ export class Session {
     if (state === 'watch' && this.released && !this.watchShown && this.farEnough(this.released)) {
       this.watchShown = true;
       this.lightUi.watch();
+      this.maybeShowInstallHint();
     }
     if (state === 'watch' && this.released && this.released.phase === 'done') {
       this.released = null;
@@ -410,5 +547,10 @@ export class Session {
   /** Test hook. */
   star(): { x: number; y: number } | null {
     return this.deps.scene.star.head();
+  }
+
+  /** Test hook: how many times the install hint has been shown. */
+  installHintCount(): number {
+    return this.deps.store.settings.installHintCount;
   }
 }

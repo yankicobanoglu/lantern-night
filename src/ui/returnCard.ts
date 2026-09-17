@@ -1,6 +1,7 @@
 import { COPY } from '../ritual/copy';
 import type { Lantern, LanternStatus } from '../store/types';
 import { button, el, formatDate } from './dom';
+import { focusFirst } from './focus';
 
 export type ReturnAnswer = Exclude<LanternStatus, 'rising'>;
 
@@ -26,6 +27,7 @@ export class ReturnScreen {
           this.question.textContent = COPY.return.options[key].reply;
           this.options.hidden = true;
           this.continueRow.hidden = false;
+          focusFirst(this.continueRow);
           onAnswer(this.lantern, key);
         }),
       );
@@ -45,6 +47,7 @@ export class ReturnScreen {
     this.options.hidden = false;
     this.continueRow.hidden = true;
     this.node.classList.add('on');
+    focusFirst(this.node);
   }
 
   hide(): void {

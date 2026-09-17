@@ -2,6 +2,7 @@ import type { MotionLevel } from '../engine/motion';
 import { COPY } from '../ritual/copy';
 import type { Settings } from '../store/types';
 import { button, el } from './dom';
+import { focusFirst } from './focus';
 
 export type SettingsHandlers = {
   onChange: (patch: Partial<Settings>) => void;
@@ -47,7 +48,10 @@ export class SettingsSheet {
     this.confirm = el('div', { class: 'confirm', hidden: true, role: 'alertdialog', 'aria-label': COPY.settings.clear }, [
       el('p', { class: 'line', text: COPY.settings.confirmClear }),
       el('div', { class: 'row' }, [
-        button(COPY.settings.keep, 'ghost small', () => (this.confirm.hidden = true)),
+        button(COPY.settings.keep, 'ghost small', () => {
+          this.confirm.hidden = true;
+          focusFirst(this.node);
+        }),
         button(COPY.settings.clear, 'primary small', () => {
           this.confirm.hidden = true;
           handlers.onClear();
@@ -68,7 +72,12 @@ export class SettingsSheet {
           button(COPY.settings.restore, 'ghost small', () => this.file.click()),
           this.file,
         ]),
-        el('div', { class: 'row' }, [button(COPY.settings.clear, 'ghost small', () => (this.confirm.hidden = false))]),
+        el('div', { class: 'row' }, [
+          button(COPY.settings.clear, 'ghost small', () => {
+            this.confirm.hidden = false;
+            focusFirst(this.confirm);
+          }),
+        ]),
         this.confirm,
         el('div', { class: 'row' }, [button(COPY.settings.close, 'primary small', () => handlers.onClose())]),
       ]),
@@ -87,7 +96,13 @@ export class SettingsSheet {
     this.markSize(settings.textScale);
     this.confirm.hidden = true;
     this.node.classList.add('on');
+    focusFirst(this.node);
     void this.handlers;
+  }
+
+  /** The mute toggle changed the setting: keep the switch in step. */
+  setSound(on: boolean): void {
+    this.sound.setAttribute('aria-checked', String(on));
   }
 
   get isOpen(): boolean {

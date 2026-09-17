@@ -112,6 +112,13 @@ export class SkyLights {
     this.buf.upload();
   }
 
+  destroy(): void {
+    this.clear();
+    this.buf.destroy();
+    this.halos.destroy();
+    this.sprite.destroy();
+  }
+
   resize(layout: Layout): void {
     this.layout = layout;
     this.buf.destroy();

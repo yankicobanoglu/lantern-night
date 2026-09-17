@@ -28,6 +28,17 @@ export class Lake {
     this.build(layout, aboveRT);
   }
 
+  destroy(): void {
+    for (const r of this.rows) r.destroy();
+    for (const t of this.rowTextures) t.destroy();
+    this.rows = [];
+    this.rowTextures = [];
+    this.rippleSprite.destroy();
+    this.ripple.destroy();
+    this.base.destroy();
+    this.container.destroy();
+  }
+
   build(layout: Layout, aboveRT: RenderTexture): void {
     this.layout = layout;
     const { width, hillsEnd, lakeEnd } = layout;

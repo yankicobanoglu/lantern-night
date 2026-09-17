@@ -1,5 +1,7 @@
 import { UPDATE_PRIORITY } from 'pixi.js';
+import { registerSW } from 'virtual:pwa-register';
 import './styles.css';
+import { AudioEngine } from './audio/engine';
 import { frameForNow, installDebug, mountFpsOverlay, readDebugOptions } from './debug';
 import { createApp } from './engine/app';
 import { computeLayout } from './engine/layout';
@@ -10,6 +12,12 @@ import { Scene } from './scene/scene';
 import { pickSkyPoint } from './scene/skyPoint';
 import { openKv } from './store/kv';
 import { Store } from './store/store';
+import { captureInstallPrompt } from './ui/install';
+
+// Offline support (SPEC section 8): the service worker precaches the site's own files; nothing else is ever fetched.
+registerSW({ immediate: true });
+// Captured early so the Install button can show the browser's prompt later.
+const installPrompt = captureInstallPrompt();
 
 async function boot(): Promise<void> {
   const canvas = document.getElementById('world');
@@ -36,19 +44,24 @@ async function boot(): Promise<void> {
   for (let i = 0; i < opts.risingLanterns; i++) scene.lanterns.spawnRising((i + 0.5) / (opts.risingLanterns + 1) * 0.8);
 
   const store = new Store(await openKv());
+  const audio = new AudioEngine();
   const session = new Session({
     root: uiRoot,
     canvas,
     scene,
     store,
+    audio,
+    renderer: app.renderer,
     layout: () => layout,
     now: opts.now,
     motionOverride: opts.motion,
     starNow: opts.starNow,
+    installForce: opts.installForce,
+    installPrompt: installPrompt.get,
     seed: opts.seed,
   });
 
-  installDebug(app, scene, session, store, stats, cpu, () => layout);
+  installDebug(app, scene, session, store, audio, stats, cpu, () => layout);
   if (opts.showFps) mountFpsOverlay(stats, cpu);
 
   let resizeTimer = 0;

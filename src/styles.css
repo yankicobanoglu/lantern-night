@@ -409,11 +409,12 @@ textarea:focus-visible {
 /* Small pills at the very bottom, clear of the lantern and of where people press. */
 .actions {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 12px;
+  right: 12px;
   bottom: calc(14px + var(--safe-bottom));
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 10px;
   transition: opacity 800ms var(--ease);
 }
@@ -445,6 +446,10 @@ textarea:focus-visible {
 .veil.on {
   opacity: 0.6;
   pointer-events: auto;
+}
+.veil:focus-visible {
+  outline: 2px solid var(--cream);
+  outline-offset: -6px;
 }
 .goodnight-line {
   position: absolute;
@@ -482,6 +487,25 @@ textarea:focus-visible {
 }
 .corner[hidden] {
   display: none;
+}
+/* The mute toggle: always visible, top right, over every overlay (SPEC section 7, Sound). */
+.corner.mute {
+  left: auto;
+  right: 10px;
+  color: var(--cream);
+  z-index: 3;
+}
+.corner.mute .slash {
+  display: none;
+}
+.corner.mute.off .wave {
+  display: none;
+}
+.corner.mute.off .slash {
+  display: block;
+}
+.corner.mute.off {
+  opacity: 0.75;
 }
 .corner i {
   display: block;
@@ -642,6 +666,9 @@ textarea:focus-visible {
   gap: 12px;
   min-height: 44px;
 }
+.setting[hidden] {
+  display: none;
+}
 .setting .label {
   font-family: var(--hand);
   font-size: 1.2rem;
@@ -708,6 +735,60 @@ textarea:focus-visible {
 }
 .confirm[hidden] {
   display: none;
+}
+
+/* Share sheet */
+.share-frame {
+  display: flex;
+  justify-content: center;
+}
+.share-preview {
+  display: block;
+  width: auto;
+  height: min(38vh, 320px);
+  aspect-ratio: 9 / 16;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  background: var(--night);
+  image-rendering: auto;
+  transition: opacity 300ms ease;
+}
+.share-preview:not([src]) {
+  opacity: 0.4;
+}
+.share.busy .share-preview {
+  opacity: 0.6;
+}
+.share .setting {
+  min-height: 40px;
+}
+
+/* Install hint: a panel near the top with the line of copy, and Install where the browser can. */
+.install {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: calc(64px + var(--safe-top));
+  margin: 0 auto;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 400ms ease,
+    visibility 0s linear 400ms;
+}
+.install.on {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+  pointer-events: auto;
+}
+.install .line {
+  font-size: 0.98rem;
 }
 
 /* ---------- Moon ---------- */

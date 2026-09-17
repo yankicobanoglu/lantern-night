@@ -2,6 +2,7 @@ import type { Layout } from '../engine/layout';
 import { COPY } from '../ritual/copy';
 import type { Lantern } from '../store/types';
 import { button, el, formatDate } from './dom';
+import { focusFirst } from './focus';
 
 /**
  * Your sky (SPEC section 4): heading, count, and one real button over every
@@ -19,7 +20,7 @@ export class SkyView {
   private layout: Layout | null = null;
   private selected: string | null = null;
 
-  constructor(root: HTMLElement, onClose: () => void) {
+  constructor(root: HTMLElement, onClose: () => void, onShare: () => void) {
     this.count = el('p', { class: 'line hand' });
     this.lights = el('div', { class: 'lights' });
     this.cardDate = el('p', { class: 'date' });
@@ -29,7 +30,11 @@ export class SkyView {
     this.node = el('section', { class: 'overlay sky', 'aria-label': COPY.sky.heading }, [
       this.lights,
       el('div', { class: 'top' }, [el('h2', { text: COPY.sky.heading }), this.count]),
-      el('div', { class: 'bottom' }, [this.empty, this.card, button(COPY.sky.close, 'ghost small', onClose)]),
+      el('div', { class: 'bottom' }, [
+        this.empty,
+        this.card,
+        el('div', { class: 'row' }, [button(COPY.share.button, 'ghost small', onShare, { 'data-action': 'share' }), button(COPY.sky.close, 'ghost small', onClose)]),
+      ]),
     ]);
     root.append(this.node);
   }
@@ -50,6 +55,12 @@ export class SkyView {
     );
     this.place(layout);
     this.node.classList.add('on');
+    focusFirst(this.node);
+  }
+
+  /** The wish of the selected light, if any. */
+  get selectedWish(): string | null {
+    return this.lanterns.find((l) => l.id === this.selected)?.text ?? null;
   }
 
   place(layout: Layout): void {

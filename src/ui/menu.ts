@@ -1,5 +1,6 @@
 import { COPY } from '../ritual/copy';
 import { button, el } from './dom';
+import { focusFirst } from './focus';
 
 /** Small corner menu: Your sky and Settings, reachable at any time (SPEC section 3). */
 export class Menu {
@@ -27,6 +28,11 @@ export class Menu {
     this.open = open;
     this.sheet.classList.toggle('on', open);
     this.button.setAttribute('aria-expanded', String(open));
+    if (open) focusFirst(this.sheet);
+  }
+
+  get isOpen(): boolean {
+    return this.open;
   }
 
   setVisible(visible: boolean): void {

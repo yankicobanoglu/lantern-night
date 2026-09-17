@@ -136,6 +136,20 @@ export class Scene {
     this.pipeline.render();
   }
 
+  /** Tear down an offscreen scene (the share image builds one per render). Cached light textures are shared and kept. */
+  destroy(): void {
+    for (const l of [...this.lanterns.lanterns]) l.destroy();
+    this.lanterns.lanterns.length = 0;
+    this.lanterns.tex.destroy();
+    this.staticBuf.destroy();
+    this.overlayBuf.destroy();
+    this.shoreBuf.destroy();
+    this.skyLights.destroy();
+    this.moon.destroy();
+    this.lake.destroy();
+    this.pipeline.destroy();
+  }
+
   private slowTick(tick: number): void {
     const o = this.overlayBuf;
     o.clear();

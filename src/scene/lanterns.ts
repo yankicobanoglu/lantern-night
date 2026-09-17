@@ -24,7 +24,7 @@ export class LanternField {
   /** Existing sky lights, so new sky points spread out. Set by the scene. */
   existingSky: () => readonly SkyPoint[] = () => [];
   motion: MotionLevel = 'full';
-  private readonly tex = new LanternTextures();
+  readonly tex = new LanternTextures();
   private nextSeed: number;
 
   constructor(private layout: Layout, seed: number) {

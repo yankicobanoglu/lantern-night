@@ -104,6 +104,9 @@ export const COPY = {
     confirmClear: "This removes every lantern from this device. It can't be undone.",
     keep: 'Keep them',
     close: 'Close',
+    /** Mute toggle labels (not in the deck; proposed in PLAN-M4). */
+    soundOn: 'Sound on',
+    soundOff: 'Sound off',
   },
   share: {
     button: 'Share my sky',

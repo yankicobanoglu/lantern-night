@@ -51,4 +51,10 @@ export class LanternTextures {
     const lit = Math.round(Math.max(0, Math.min(1, fill)) * PAPER_ROWS);
     return this.big[frame % FRAMES]?.[lit] ?? Texture.EMPTY;
   }
+
+  destroy(): void {
+    for (const row of this.big) for (const t of row) t.destroy(true);
+    for (const t of this.small) t.destroy(true);
+    for (const t of this.dot) t.destroy(true);
+  }
 }

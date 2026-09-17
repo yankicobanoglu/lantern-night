@@ -1,4 +1,5 @@
 import type { Application } from 'pixi.js';
+import type { AudioEngine, AudioState } from './audio/engine';
 import type { Layout } from './engine/layout';
 import type { FrameStats } from './engine/ticker';
 import type { Session } from './ritual/session';
@@ -22,6 +23,8 @@ export type DebugOptions = {
   motion: 'gentle' | 'full' | null;
   /** ?star=now: a shooting star right away. */
   starNow: boolean;
+  /** ?install=ios|prompt forces an install hint path. */
+  installForce: 'ios' | 'prompt' | null;
 };
 
 export function readDebugOptions(search: string): DebugOptions {
@@ -42,6 +45,7 @@ export function readDebugOptions(search: string): DebugOptions {
     skyLights: count('sky', 1000),
     motion: motion === 'gentle' || motion === 'full' ? motion : null,
     starNow: params.get('star') === 'now',
+    installForce: params.get('install') === 'ios' ? 'ios' : params.get('install') === 'prompt' ? 'prompt' : null,
   };
 }
 
@@ -76,6 +80,12 @@ export type LanternDebug = {
   /** Shooting star head in CSS px while tappable, else null; spawn one now. */
   star: () => { x: number; y: number } | null;
   spawnStar: () => boolean;
+  /** Soundscape state. */
+  audio: () => AudioState;
+  /** Compose the share image now (optionally with a wish) and return it as a PNG data URL. */
+  shareImage: (wish?: string | null) => Promise<string>;
+  /** Install hint: the detected path and how often the hint has been shown. */
+  install: () => { path: string; hintCount: number };
   /** The live scene, for manual inspection in dev. */
   scene: Scene;
   ready: boolean;
@@ -92,6 +102,7 @@ export function installDebug(
   scene: Scene,
   session: Session,
   store: Store,
+  audio: AudioEngine,
   stats: FrameStats,
   cpu: FrameStats,
   getLayout: () => Layout,
@@ -145,6 +156,9 @@ export function installDebug(
     },
     star: () => session.star(),
     spawnStar: () => session.spawnStarNow(),
+    audio: () => audio.state,
+    shareImage: async (wish = null) => (await session.renderShare(wish)).toDataURL('image/png'),
+    install: () => ({ path: session.installPath(), hintCount: session.installHintCount() }),
     scene,
     ready: false,
   };

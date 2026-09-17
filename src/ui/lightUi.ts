@@ -2,6 +2,7 @@ import { HOLD_MS } from '../config';
 import type { MotionLevel } from '../engine/motion';
 import { COPY, type Mode } from '../ritual/copy';
 import { button, el } from './dom';
+import { focusFirst } from './focus';
 
 /**
  * The stage overlay for Light, Release and Watch: a breath ring that expands
@@ -20,13 +21,14 @@ export class LightUi {
   private readonly releaseBtn: HTMLButtonElement;
   private readonly anotherBtn: HTMLButtonElement;
   private readonly goodnightBtn: HTMLButtonElement;
+  private readonly shareBtn: HTMLButtonElement;
   private hintTimer = 0;
   private side: 'left' | 'right' = 'left';
 
   constructor(
     root: HTMLElement,
     motion: MotionLevel,
-    handlers: { onLightTap: () => void; onRelease: () => void; onAnother: () => void; onGoodnight: () => void },
+    handlers: { onLightTap: () => void; onRelease: () => void; onAnother: () => void; onGoodnight: () => void; onShare: () => void },
   ) {
     this.root = root;
     this.ring = el('div', { class: 'breath', 'aria-hidden': 'true' });
@@ -36,7 +38,8 @@ export class LightUi {
     this.releaseBtn = button(COPY.release.letItRise, 'primary small', handlers.onRelease, { 'data-action': 'release' });
     this.anotherBtn = button(COPY.release.lightAnother, 'primary small', handlers.onAnother, { 'data-action': 'another' });
     this.goodnightBtn = button(COPY.release.goodnight, 'ghost small', handlers.onGoodnight, { 'data-action': 'goodnight' });
-    this.actions = el('div', { class: 'actions' }, [this.lightBtn, this.releaseBtn, this.anotherBtn, this.goodnightBtn]);
+    this.shareBtn = button(COPY.share.button, 'ghost small', handlers.onShare, { 'data-action': 'share' });
+    this.actions = el('div', { class: 'actions' }, [this.lightBtn, this.releaseBtn, this.anotherBtn, this.goodnightBtn, this.shareBtn]);
     this.stage = el('div', { class: 'stage' }, [this.ring, this.hint, this.wish, this.actions]);
     root.append(this.stage);
     this.ring.style.transitionDuration = `${HOLD_MS}ms`;
@@ -96,7 +99,7 @@ export class LightUi {
   }
 
   private showButtons(...visible: HTMLButtonElement[]): void {
-    for (const b of [this.lightBtn, this.releaseBtn, this.anotherBtn, this.goodnightBtn]) b.hidden = !visible.includes(b);
+    for (const b of [this.lightBtn, this.releaseBtn, this.anotherBtn, this.goodnightBtn, this.shareBtn]) b.hidden = !visible.includes(b);
     this.actions.dataset['empty'] = String(visible.length === 0);
     this.actions.classList.remove('fade-in');
   }
@@ -114,6 +117,7 @@ export class LightUi {
     this.say(COPY.light.idle);
     this.ring.classList.remove('holding', 'done');
     this.showButtons(this.lightBtn);
+    focusFirst(this.actions);
   }
 
   holding(holding: boolean): void {
@@ -129,6 +133,7 @@ export class LightUi {
     this.ring.classList.remove('holding');
     this.ring.classList.add('done');
     this.showButtons(this.releaseBtn);
+    focusFirst(this.actions);
     window.clearTimeout(this.hintTimer);
     this.hintTimer = window.setTimeout(() => this.say(COPY.light.hint), 2600);
   }
@@ -155,8 +160,9 @@ export class LightUi {
     this.stage.dataset['state'] = 'watch';
     window.clearTimeout(this.hintTimer);
     this.say(COPY.release.watch);
-    this.showButtons(this.anotherBtn, this.goodnightBtn);
+    this.showButtons(this.anotherBtn, this.goodnightBtn, this.shareBtn);
     this.actions.classList.add('fade-in');
+    focusFirst(this.actions);
   }
 
   hide(): void {

@@ -1,5 +1,6 @@
 import { clampText, COPY, intentionCopy, MAX_TEXT, type Mode } from '../ritual/copy';
 import { button, el } from './dom';
+import { focusNode } from './focus';
 
 /**
  * Intention screen (SPEC section 3, step 3): mode toggle, heading, one field
@@ -113,6 +114,8 @@ export class IntentionScreen {
     this.lastChip = null;
     this.onInput();
     this.node.classList.add('on');
+    // The field is where the ritual continues; the mode toggle stays one Shift+Tab away.
+    focusNode(this.field);
   }
 
   hide(): void {

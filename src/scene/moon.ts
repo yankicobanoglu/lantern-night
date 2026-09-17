@@ -29,6 +29,13 @@ export class Moon {
     this.halo.alpha = 0.12 + 0.5 * lit;
   }
 
+  destroy(): void {
+    for (const f of this.frames) f.destroy(true);
+    this.frames = [];
+    this.halo.destroy();
+    this.sprite.destroy();
+  }
+
   get currentFrame(): MoonFrame {
     return this.frame;
   }

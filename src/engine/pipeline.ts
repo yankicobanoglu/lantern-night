@@ -46,6 +46,15 @@ export class Pipeline {
     this.applyScale(layout);
   }
 
+  destroy(): void {
+    this.aboveRT.destroy(true);
+    this.worldRT.destroy(true);
+    this.upscale.destroy();
+    this.light.destroy({ children: true });
+    this.world.destroy({ children: true });
+    this.above.destroy({ children: true });
+  }
+
   /** Run the two art-px passes. Call before the stage renders. */
   render(): void {
     this.renderer.render({ container: this.above, target: this.aboveRT, clear: true });
