@@ -17,3 +17,24 @@ export const REGIONS = {
 
 /** Frequency of the slow tick that animates the pixel layer (window flicker, ripples, twinkle). */
 export const SLOW_TICK_HZ = 10;
+
+/** Hold-to-light duration (SPEC section 3: press and hold for 4 s while a breath guide expands). */
+export const HOLD_MS = 4000;
+/** Tap alternative: the lantern fills on its own over this time. */
+export const TAP_LIGHT_MS = 1200;
+/** Early release: the fill eases back down at this rate (fill units per second). */
+export const UNFILL_PER_S = 0.9;
+
+/** Rise speed in art px per second at the start of the rise; it eases to about a third near the sky point. */
+export const RISE_SPEED = 13;
+/** Reduced motion: the rise takes this many times longer. */
+export const REDUCED_MOTION_RISE_FACTOR = 1.6;
+/** Up to 12 active lanterns at once (SPEC section 8). */
+export const MAX_ACTIVE = 12;
+/** Up to 1,000 sky lights (SPEC section 8). */
+export const MAX_SKY = 1000;
+/** Delay before the next unlit lantern appears over the dock after a release: after both release lines have shown. */
+export const NEXT_LANTERN_DELAY_MS = 4500;
+
+/** Fireflies along the shore; halved under reduced motion. */
+export const FIREFLY_COUNT = 14;

@@ -7,17 +7,28 @@
     <meta name="color-scheme" content="dark" />
     <title>Lantern Night</title>
     <style>
+      :root {
+        --night: #1b1b3a;
+        --apricot: #e8a07a;
+        --glow: #ffb547;
+        --cream: #fff4d6;
+        --ink: #2a1a0a;
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --lantern-y: 70%;
+      }
       html, body {
         margin: 0;
         padding: 0;
         width: 100%;
         height: 100%;
-        background: #1B1B3A;
+        background: var(--night);
         overflow: hidden;
         overscroll-behavior: none;
         -webkit-user-select: none;
         user-select: none;
         -webkit-touch-callout: none;
+        font-family: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        color: var(--cream);
       }
       #world {
         position: fixed;
@@ -28,10 +39,90 @@
         touch-action: none;
         image-rendering: pixelated;
       }
+      #ui {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        touch-action: none;
+        z-index: 2;
+      }
+      #ui[data-state='hidden'] { visibility: hidden; }
+      .breath {
+        position: absolute;
+        width: 44px;
+        height: 44px;
+        margin: -22px 0 0 -22px;
+        border-radius: 50%;
+        border: 2px solid rgba(232, 160, 122, 0.55);
+        box-shadow: 0 0 24px rgba(255, 181, 71, 0.25);
+        opacity: 0;
+        transform: scale(1);
+        transition-property: transform, opacity;
+        transition-timing-function: cubic-bezier(0.33, 0.0, 0.2, 1);
+        transition-duration: 4000ms;
+      }
+      #ui[data-state='idle'] .breath { opacity: 0.45; transition-duration: 700ms; }
+      .breath.holding { opacity: 0.9; transform: scale(5); }
+      .breath.done { opacity: 0; transform: scale(5.6); transition-duration: 900ms; }
+      #ui.gentle .breath.holding { transform: scale(2.2); }
+      .hint {
+        position: absolute;
+        left: 16px;
+        right: 16px;
+        bottom: calc(100% - var(--lantern-y, 70%) + 34px);
+        margin: 0;
+        text-align: center;
+        font-size: 17px;
+        font-weight: 600;
+        line-height: 1.4;
+        text-shadow: 0 1px 12px rgba(27, 27, 58, 0.9), 0 0 2px rgba(27, 27, 58, 1);
+        transition: opacity 500ms ease;
+      }
+      .actions {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: calc(40px + var(--safe-bottom));
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        pointer-events: none;
+      }
+      .btn {
+        pointer-events: auto;
+        min-height: 44px;
+        min-width: 44px;
+        padding: 10px 22px;
+        border-radius: 12px;
+        font: inherit;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 400ms ease, transform 400ms ease;
+      }
+      .btn[hidden] { display: none; }
+      .btn.primary {
+        background: var(--glow);
+        color: var(--ink);
+        border: 1px solid rgba(232, 160, 122, 0.2);
+      }
+      .btn.ghost {
+        background: rgba(27, 27, 58, 0.72);
+        color: var(--cream);
+        border: 1px solid rgba(232, 160, 122, 0.2);
+      }
+      .btn:focus-visible {
+        outline: 2px solid var(--cream);
+        outline-offset: 2px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .breath { transition-duration: 600ms !important; }
+      }
     </style>
   </head>
   <body>
-    <canvas id="world" aria-label="A quiet lake at dusk. Hills with two lit cottages, pine trees, a wooden dock, and the moon in the upper right sky."></canvas>
+    <canvas id="world" aria-label="A quiet lake at dusk. Hills with two lit cottages, pine trees, a wooden dock, and the moon in the upper right sky. A paper lantern waits over the dock; released lanterns rise and settle among the stars."></canvas>
+    <div id="ui" data-state="hidden"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

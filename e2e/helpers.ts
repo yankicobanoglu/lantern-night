@@ -46,6 +46,7 @@ export type LayoutInfo = {
   moon: { x: number; y: number };
   dockX: number;
   landscape: boolean;
+  lanternRest: { x: number; y: number };
 };
 
 export function getLayout(page: Page): Promise<LayoutInfo> {
@@ -62,6 +63,7 @@ export function getLayout(page: Page): Promise<LayoutInfo> {
       moon: l.moon,
       dockX: l.dockX,
       landscape: l.landscape,
+      lanternRest: l.lanternRest,
     };
   });
 }

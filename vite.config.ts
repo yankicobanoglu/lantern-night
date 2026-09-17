@@ -8,7 +8,7 @@ export default defineConfig({
     sourcemap: false,
   },
   server: {
-    port: 5173,
+    port: Number(process.env['PORT']) || 5173,
   },
   preview: {
     port: 4173,

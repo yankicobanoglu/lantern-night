@@ -1,6 +1,7 @@
 import type { Application } from 'pixi.js';
 import type { Layout } from './engine/layout';
 import type { FrameStats } from './engine/ticker';
+import type { HoldController } from './ritual/hold';
 import { moonAge, moonFrame, type MoonFrame } from './ritual/moonPhase';
 import type { Scene } from './scene/scene';
 
@@ -11,6 +12,12 @@ export type DebugOptions = {
   forcedFrame: MoonFrame | null;
   seed: number;
   showFps: boolean;
+  /** ?lanterns=N: spawn N lit lanterns already rising (perf test). */
+  risingLanterns: number;
+  /** ?sky=N: seed N past lanterns in the sky (legibility test). */
+  skyLights: number;
+  /** ?motion=gentle|full overrides the system setting. */
+  motion: 'gentle' | 'full' | null;
 };
 
 export function readDebugOptions(search: string): DebugOptions {
@@ -20,11 +27,16 @@ export function readDebugOptions(search: string): DebugOptions {
   const phase = params.get('phase');
   const forced = phase !== null && /^[0-7]$/.test(phase) ? (Number(phase) as MoonFrame) : null;
   const seedParam = params.get('seed');
+  const count = (key: string, max: number): number => Math.max(0, Math.min(max, Number(params.get(key) ?? 0) || 0));
+  const motion = params.get('motion');
   return {
     now: fixed && !Number.isNaN(fixed.getTime()) ? () => fixed : () => new Date(),
     forcedFrame: forced,
     seed: seedParam ? Number(seedParam) >>> 0 : 7,
     showFps: params.has('debug'),
+    risingLanterns: count('lanterns', 12),
+    skyLights: count('sky', 1000),
+    motion: motion === 'gentle' || motion === 'full' ? motion : null,
   };
 }
 
@@ -41,6 +53,17 @@ export type LanternDebug = {
   samplePixel: (x: number, y: number) => number;
   /** Read a rectangle of the composed world as hex numbers, row-major (-1 for transparent). */
   sampleRect: (x: number, y: number, w: number, h: number) => number[];
+  /** Active lanterns: phase, fill, art-px centre and rise progress. */
+  lanterns: () => { phase: string; fill: number; x: number; y: number; p: number }[];
+  skyLights: () => number;
+  /** Hold state machine. */
+  hold: () => { state: string; fill: number };
+  /** Light the waiting lantern instantly. */
+  light: () => void;
+  /** Release the lit lantern (as the button would). */
+  release: () => void;
+  /** Time multiplier for the scene (not for input). */
+  speed: (x: number) => void;
   ready: boolean;
 };
 
@@ -53,6 +76,7 @@ declare global {
 export function installDebug(
   app: Application,
   scene: Scene,
+  hold: HoldController,
   stats: FrameStats,
   cpu: FrameStats,
   getLayout: () => Layout,
@@ -88,6 +112,14 @@ export function installDebug(
       const result: number[] = [];
       for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) result.push(readPixel(out.pixels, out.width, xx, yy));
       return result;
+    },
+    lanterns: () => scene.lanterns.lanterns.map((l) => ({ phase: l.phase, fill: l.fill, x: l.x, y: l.y, p: l.rise.p })),
+    skyLights: () => scene.skyLights.lights.length,
+    hold: () => ({ state: hold.state, fill: hold.fill }),
+    light: () => hold.lightNow(),
+    release: () => hold.releaseNow(),
+    speed: (x) => {
+      scene.speed = x;
     },
     ready: false,
   };

@@ -8,7 +8,7 @@ import { PALETTE } from '../palette';
  * reeds and the dock. Rows above the shore stay transparent so the lake shows.
  */
 export function drawShore(buf: PixelBuffer, layout: Layout, seed: number): void {
-  const { width, hillsEnd, lakeEnd, height, dockX, landscape } = layout;
+  const { width, hillsEnd, lakeEnd, height, dockX, landscape, dockLen } = layout;
   const top = lakeEnd - hillsEnd; // local row of the shoreline
 
   // Shore band with a slightly ragged edge.
@@ -18,7 +18,6 @@ export function drawShore(buf: PixelBuffer, layout: Layout, seed: number): void 
   }
 
   // Dock, seen from behind: narrows slightly as it goes out over the water.
-  const dockLen = landscape ? 20 : 16;
   const nearW = landscape ? 22 : 18;
   const farW = nearW - 6;
   const dockTop = top - dockLen;

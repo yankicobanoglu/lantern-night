@@ -1,21 +1,30 @@
 import { Sprite, type Container, type Renderer } from 'pixi.js';
 import { SLOW_TICK_HZ } from '../config';
 import type { Layout } from '../engine/layout';
+import type { MotionLevel } from '../engine/motion';
 import { Pipeline } from '../engine/pipeline';
 import { PixelBuffer } from '../engine/pixelBuffer';
 import { hash01 } from '../engine/rng';
 import { SlowTick } from '../engine/ticker';
 import { PALETTE } from '../palette';
 import type { MoonFrame } from '../ritual/moonPhase';
+import { Fireflies } from './fireflies';
 import { drawHills, type Window } from './hills';
 import { Lake } from './lake';
+import { LanternField } from './lanterns';
 import { Moon } from './moon';
 import { drawShore } from './shore';
 import { drawSky, type Star } from './sky';
+import { SkyLights } from './skyLights';
 
 export class Scene {
   readonly pipeline: Pipeline;
   readonly moon: Moon;
+  readonly lanterns: LanternField;
+  readonly skyLights: SkyLights;
+  readonly fireflies: Fireflies;
+  /** Time multiplier for the animated parts (test hook; 1 in normal use). */
+  speed = 1;
   private lake: Lake;
   private staticBuf: PixelBuffer;
   private staticSprite: Sprite;
@@ -29,7 +38,7 @@ export class Scene {
   private timeMs = 0;
   layout: Layout;
 
-  constructor(renderer: Renderer, stage: Container, layout: Layout, readonly seed: number) {
+  constructor(renderer: Renderer, stage: Container, layout: Layout, readonly seed: number, motion: MotionLevel) {
     this.layout = layout;
     this.pipeline = new Pipeline(renderer, stage, layout);
     this.staticBuf = new PixelBuffer(1, 1);
@@ -39,9 +48,20 @@ export class Scene {
     this.overlaySprite = new Sprite();
     this.shoreSprite = new Sprite();
     this.moon = new Moon(layout, this.pipeline.light);
-    this.pipeline.above.addChild(this.staticSprite, this.overlaySprite, this.moon.sprite);
+    this.skyLights = new SkyLights(layout);
+    this.lanterns = new LanternField(layout, seed);
+    this.lanterns.motion = motion;
+    this.lanterns.existingSky = () => this.skyLights.points;
+    this.lanterns.onHandOff = (h) => this.skyLights.add({ seed: h.seed, sky: h.sky, status: 'rising' });
+    this.fireflies = new Fireflies(layout, seed, motion);
+
+    // Pixel layers, back to front.
+    this.pipeline.above.addChild(this.staticSprite, this.overlaySprite, this.skyLights.sprite, this.moon.sprite, this.lanterns.aboveLayer);
     this.lake = new Lake(layout, this.pipeline.aboveRT);
-    this.pipeline.world.addChild(this.lake.container, this.shoreSprite);
+    this.pipeline.world.addChild(this.lake.container, this.lanterns.nearLayer, this.shoreSprite, this.fireflies.sprite);
+    // Light layer: sky halos under the lanterns' own light, fireflies on top.
+    this.pipeline.light.addChild(this.skyLights.halos, this.lanterns.lightLayer, this.fireflies.light);
+
     this.slow = new SlowTick(SLOW_TICK_HZ, (t) => this.slowTick(t));
     this.build(layout);
   }
@@ -68,10 +88,13 @@ export class Scene {
     this.slowTick(this.slow.tick);
   }
 
-  resize(layout: Layout): void {
+  resize(layout: Layout, motion: MotionLevel): void {
     this.layout = layout;
     this.pipeline.resize(layout);
     this.lake.build(layout, this.pipeline.aboveRT);
+    this.skyLights.resize(layout);
+    this.lanterns.resize(layout);
+    this.fireflies.build(layout, motion);
     this.build(layout);
   }
 
@@ -81,9 +104,14 @@ export class Scene {
 
   /** Per-frame update, then the two art-px render passes. */
   update(dtMs: number): void {
-    this.timeMs += dtMs;
-    this.slow.advance(dtMs);
+    const dt = Math.min(dtMs, 100) * this.speed;
+    this.timeMs += dt;
+    const tSec = this.timeMs / 1000;
+    this.slow.advance(dt);
     this.lake.update(this.timeMs);
+    this.lanterns.update(dt / 1000, tSec);
+    this.skyLights.update(tSec);
+    this.fireflies.update(dt / 1000, tSec);
     this.pipeline.render();
   }
 
@@ -108,5 +136,7 @@ export class Scene {
     }
     o.upload();
     this.lake.slowTick(tick);
+    this.skyLights.drawTick(tick);
+    this.fireflies.drawTick(tick);
   }
 }
