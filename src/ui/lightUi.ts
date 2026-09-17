@@ -44,15 +44,23 @@ export class LightUi {
    * Follow the lantern (CSS px): the breath ring sits around it and the caption
    * floats beside it, on whichever side has more room.
    */
+  private side: 'left' | 'right' = 'left';
+
   follow(cssX: number, cssY: number, viewportWidth: number): void {
     this.ring.style.left = `${cssX}px`;
     this.ring.style.top = `${cssY}px`;
     this.root.style.setProperty('--lantern-y', `${cssY.toFixed(1)}px`);
-    // Caption beside the lantern, on the side with more room, kept inside a 12 px gutter.
-    const gap = 40;
+    // Caption to the left of the lantern. It only moves to the right when the left
+    // no longer fits (the lantern drifted to the edge), and stays there until that side stops fitting.
+    const gap = 36;
     const w = 140;
-    const left = cssX > viewportWidth / 2;
-    const x = left ? Math.max(12, cssX - gap - w) : Math.min(cssX + gap, viewportWidth - 12 - w);
+    const gutter = 8;
+    const fitsLeft = cssX - gap - w >= gutter;
+    const fitsRight = cssX + gap + w <= viewportWidth - gutter;
+    if (this.side === 'left' && !fitsLeft && fitsRight) this.side = 'right';
+    else if (this.side === 'right' && !fitsRight && fitsLeft) this.side = 'left';
+    const left = this.side === 'left';
+    const x = left ? Math.max(gutter, cssX - gap - w) : Math.min(cssX + gap, viewportWidth - gutter - w);
     this.root.style.setProperty('--hint-x', `${x.toFixed(1)}px`);
     this.hint.classList.toggle('left', left);
   }

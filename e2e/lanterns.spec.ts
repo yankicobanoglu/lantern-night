@@ -25,6 +25,7 @@ test.describe('lanterns', () => {
     expect(px.filter((c) => c === PALETTE.plum).length).toBeGreaterThanOrEqual(150);
     expect(px.filter((c) => WARM.includes(c)).length).toBe(0);
     await expect(page.locator('#ui .hint')).toHaveText('Hold to light your lantern');
+    await expect(page.locator('#ui .hint')).toHaveClass(/left/);
     await expect(page.getByRole('button', { name: 'Light it' })).toBeVisible();
     await saveScreenshots(page, testInfo, 'lantern-unlit');
   });
@@ -83,12 +84,19 @@ test.describe('lanterns', () => {
     expect(mid.p).toBeLessThan(0.5);
     await saveScreenshots(page, testInfo, 'lantern-rising');
 
-    // A fresh lantern appears on the shore and the hint returns.
-    await page.waitForFunction(() => window.__lantern!.lanterns().some((l) => l.phase === 'unlit'), undefined, { timeout: 3000 });
+    // No fresh lantern yet: the next one waits until this one has passed half of the sky.
+    expect(await page.evaluate(() => window.__lantern!.lanterns().some((l) => l.phase === 'unlit'))).toBe(false);
+    await expect(page.locator('#ui .hint')).toHaveClass(/left/);
+
+    // Speed time up: the next lantern appears once the first is above the middle of the sky (or already small).
+    await page.evaluate(() => window.__lantern!.speed(8));
+    await page.waitForFunction(() => window.__lantern!.lanterns().some((l) => l.phase === 'unlit'), undefined, { timeout: 15_000 });
+    const risen = await page.evaluate(() => window.__lantern!.lanterns().find((l) => l.phase === 'rising')!);
+    const { horizon } = await getLayout(page);
+    expect(risen.y <= horizon * 0.5 + 8 || risen.p >= 0.85).toBe(true);
     await expect(page.locator('#ui .hint')).toHaveText('Hold to light your lantern');
 
-    // Speed time up and wait for the hand-off.
-    await page.evaluate(() => window.__lantern!.speed(8));
+    // Wait for the hand-off.
     await page.waitForFunction((n) => window.__lantern!.skyLights() === n + 1, skyBefore, { timeout: 15_000 });
     await page.evaluate(() => window.__lantern!.speed(1));
     expect(await page.evaluate(() => window.__lantern!.lanterns().filter((l) => l.phase === 'rising').length)).toBe(0);

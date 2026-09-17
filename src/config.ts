@@ -33,8 +33,13 @@ export const REDUCED_MOTION_RISE_FACTOR = 1.6;
 export const MAX_ACTIVE = 12;
 /** Up to 1,000 sky lights (SPEC section 8). */
 export const MAX_SKY = 1000;
-/** Delay before the next unlit lantern appears over the dock after a release: after both release lines have shown. */
-export const NEXT_LANTERN_DELAY_MS = 4500;
+/**
+ * The next unlit lantern appears on the shore once the released one has passed
+ * this fraction of the sky band (measured from the horizon up), or has shrunk to
+ * its dot stage, whichever comes first (review note after M2b: 4.5 s was too quick).
+ */
+export const NEXT_LANTERN_SKY_FRACTION = 0.5;
+export const NEXT_LANTERN_MIN_PROGRESS = 0.85;
 
 /** Fireflies along the shore; halved under reduced motion. */
 export const FIREFLY_COUNT = 14;

@@ -1,5 +1,5 @@
 import { UPDATE_PRIORITY } from 'pixi.js';
-import { NEXT_LANTERN_DELAY_MS } from './config';
+import { NEXT_LANTERN_MIN_PROGRESS, NEXT_LANTERN_SKY_FRACTION } from './config';
 import { frameForNow, installDebug, mountFpsOverlay, readDebugOptions } from './debug';
 import { createApp } from './engine/app';
 import { computeLayout } from './engine/layout';
@@ -64,7 +64,6 @@ async function boot(): Promise<void> {
       if (l && scene.lanterns.release(l)) {
         released = l;
         ui.released('wish');
-        window.setTimeout(nextLantern, NEXT_LANTERN_DELAY_MS);
       }
     },
   });
@@ -74,6 +73,9 @@ async function boot(): Promise<void> {
     hold.arm();
     ui.idle();
   };
+  /** The released lantern is well on its way: above the middle of the sky, or already small. */
+  const farEnough = (l: Lantern): boolean =>
+    l.phase !== 'rising' || l.y <= layout.horizon * (1 - NEXT_LANTERN_SKY_FRACTION) || l.rise.p >= NEXT_LANTERN_MIN_PROGRESS;
   nextLantern();
 
   installDebug(app, scene, hold, stats, cpu, () => layout);
@@ -99,6 +101,7 @@ async function boot(): Promise<void> {
       const t0 = performance.now();
       hold.update(ticker.deltaMS);
       scene.update(ticker.deltaMS);
+      if (released && !scene.lanterns.resting && farEnough(released)) nextLantern();
       follow();
       cpu.push(performance.now() - t0);
       if (window.__lantern && !window.__lantern.ready) {
