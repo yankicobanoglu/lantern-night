@@ -90,11 +90,13 @@ export async function openRitual(page: Page, query: string): Promise<void> {
 }
 
 /** Begin → intention → fold, leaving an unlit lantern on the shore. */
-export async function foldLantern(page: Page, text: string, mode: 'wish' | 'let-go' = 'wish'): Promise<void> {
+export async function foldLantern(page: Page, text: string, mode: 'wish' | 'let-go' = 'wish', kind?: 'sky' | 'water'): Promise<void> {
   await page.getByRole('button', { name: 'Begin' }).click();
   await page.waitForSelector('#ui[data-state="intention"]');
   await page.getByRole('button', { name: mode === 'wish' ? 'Make a wish' : 'Let something go' }).click();
   await page.getByLabel('Your intention').fill(text);
+  // The kind of lantern (M7): left alone it keeps whatever was chosen last.
+  if (kind) await page.getByRole('button', { name: kind === 'water' ? 'Water lantern' : 'Sky lantern', exact: true }).click();
   await page.getByRole('button', { name: 'Fold my lantern' }).click();
   await page.waitForSelector('#ui[data-state="light"]');
   await page.waitForFunction(() => window.__lantern!.lanterns().some((l) => l.phase === 'unlit'));
@@ -131,6 +133,8 @@ export type StoredLantern = {
   status: 'rising' | 'came-true' | 'still-growing' | 'let-go';
   sky: { x: number; y: number };
   seed: number;
+  /** Which kind of lantern it was (M7). A record seeded without one reads as 'sky'. */
+  kind?: 'sky' | 'water';
 };
 
 export function lanternAt(daysAgo: number, now: Date, over: Partial<StoredLantern> = {}): StoredLantern {
@@ -144,12 +148,13 @@ export function lanternAt(daysAgo: number, now: Date, over: Partial<StoredLanter
     status: over.status ?? 'rising',
     sky: over.sky ?? { x: 0.2 + (daysAgo % 5) * 0.12, y: 0.15 + (daysAgo % 3) * 0.12 },
     seed: over.seed ?? daysAgo * 7919,
+    ...(over.kind ? { kind: over.kind } : {}),
   };
 }
 
 /** Seed stored lanterns through the app's hook, then reload so they load like real data. */
 export async function seedLanterns(page: Page, query: string, lanterns: StoredLantern[]): Promise<void> {
   await openRitual(page, query);
-  await page.evaluate((ls) => window.__lantern!.store.seed(ls), lanterns);
+  await page.evaluate((ls) => window.__lantern!.store.seed(ls as never), lanterns);
   await openRitual(page, query);
 }

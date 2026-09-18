@@ -2,7 +2,7 @@ import { Container, RenderTexture, type Renderer } from 'pixi.js';
 import { computeLayout } from '../engine/layout';
 import type { MoonFrame } from '../ritual/moonPhase';
 import { COPY } from '../ritual/copy';
-import type { SceneKind } from '../scene/field';
+import type { LanternKind } from '../scene/field';
 import { Scene } from '../scene/scene';
 import type { SkyLight } from '../scene/skyLights';
 
@@ -16,14 +16,13 @@ export type ShareInput = {
   moonFrame: MoonFrame;
   /** Every light in tonight's sky (stored and session-only). */
   skyLights: readonly SkyLight[];
-  /** Rise progress (0–1) of each lantern still on its way. */
-  rising: readonly number[];
+  /** Each lantern still on its way: how far along it is (0–1), and which kind it is. */
+  rising: readonly { p: number; kind: LanternKind }[];
   /** The wish to include, or null. */
   wish: string | null;
   /** Session light arc position, so the image matches the screen. */
   evening: number;
-  /** The scene in use (ROADMAP 4.1) and tonight's moon size (4.6). */
-  kind: SceneKind;
+  /** Tonight's moon size (ROADMAP 4.6). */
   supermoon: boolean;
 };
 
@@ -75,12 +74,12 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 export async function composeShareCanvas(input: ShareInput): Promise<HTMLCanvasElement> {
   const layout = computeLayout(SHARE_W, SHARE_H, 1);
   const stage = new Container();
-  const scene = new Scene(input.renderer, stage, layout, input.seed, 'full', input.kind);
+  const scene = new Scene(input.renderer, stage, layout, input.seed, 'full');
   scene.setMoonFrame(input.moonFrame);
   scene.moon.setSupermoon(input.supermoon);
   scene.setEvening(input.evening);
-  for (const l of input.skyLights) scene.skyLights.add({ seed: l.seed, sky: l.sky, status: l.status });
-  for (const p of input.rising) scene.lanterns.spawnRising(Math.max(0.02, Math.min(0.98, p)));
+  for (const l of input.skyLights) scene.addLight({ seed: l.seed, sky: l.sky, status: l.status, kind: l.kind });
+  for (const r of input.rising) scene.lanternsOf(r.kind).spawnRising(Math.max(0.02, Math.min(0.98, r.p)));
   // A few frames so the halos, bob and flicker take their normal values.
   for (let i = 0; i < 3; i++) scene.update(16);
 

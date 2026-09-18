@@ -9,30 +9,37 @@ import { SlowTick } from '../engine/ticker';
 import type { QualityLevel } from '../engine/quality';
 import { PALETTE } from '../palette';
 import type { MoonFrame } from '../ritual/moonPhase';
+import { MAX_ACTIVE } from '../config';
 import { Cozy } from './cozy';
-import type { Field, SceneKind } from './field';
+import type { Field, LanternKind } from './field';
 import { Fireflies } from './fireflies';
 import { drawHills, type Window } from './hills';
 import { Lake } from './lake';
+import type { Lantern } from './lantern';
 import { LanternField } from './lanterns';
 import { Moon } from './moon';
 import { drawShore } from './shore';
 import { ShootingStar } from './shootingStar';
 import { bandBoundaries, drawSkyBands, drawStars, type Star } from './sky';
-import { SkyLights } from './skyLights';
+import { SkyLights, type SkyLight } from './skyLights';
 
 /**
- * One world for the ritual. The kind (ROADMAP 4.1) says what the lantern is
- * and where it goes: `sky` lanterns rise from the shore into the sky band,
- * `water` lanterns drift out across the lake. Everything else (sky, hills,
- * cottages, lake, shore, moon, fireflies, boat, mist, shooting star) is shared.
+ * One world for the ritual, holding both kinds of lantern at once (M7). A sky
+ * lantern rises from the shore into the sky band; a water lantern drifts out
+ * across the lake. Each kind has its own sprite set, rest point, drift tuning,
+ * field and set of settled lights, and the two never mix: the kind a lantern
+ * was lit as is the kind it stays. Everything else (sky, hills, cottages,
+ * lake, shore, moon, fireflies, boat, mist, shooting star) is shared.
  */
 export class Scene {
   readonly pipeline: Pipeline;
   readonly moon: Moon;
-  readonly lanterns: LanternField;
-  /** Past lanterns as lights, in the kind's field (the sky, or the lake). */
+  /** Active lanterns, one set per kind. */
+  readonly skyLanterns: LanternField;
+  readonly waterLanterns: LanternField;
+  /** Settled lanterns as lights: in the sky band, and on the lake. */
   readonly skyLights: SkyLights;
+  readonly waterLights: SkyLights;
   readonly fireflies: Fireflies;
   readonly cozy: Cozy;
   readonly star: ShootingStar;
@@ -64,7 +71,6 @@ export class Scene {
     layout: Layout,
     readonly seed: number,
     motion: MotionLevel,
-    readonly kind: SceneKind = 'sky',
   ) {
     this.layout = layout;
     this.pipeline = new Pipeline(renderer, stage, layout);
@@ -75,36 +81,131 @@ export class Scene {
     this.overlaySprite = new Sprite();
     this.shoreSprite = new Sprite();
     this.moon = new Moon(layout, this.pipeline.light);
-    this.lanterns = new LanternField(layout, seed, kind);
-    this.lanterns.motion = motion;
-    this.skyLights = new SkyLights(this.lanterns.field, layout.cssScale);
-    this.lanterns.existingSky = () => this.skyLights.points;
-    this.lanterns.onHandOff = (h) => this.skyLights.add({ seed: h.seed, sky: h.sky, status: 'rising', ...(h.id ? { id: h.id } : {}) });
+    this.skyLanterns = new LanternField(layout, seed, 'sky');
+    this.waterLanterns = new LanternField(layout, seed ^ 0x9e37, 'water');
+    this.skyLights = new SkyLights(this.skyLanterns.field, layout.cssScale);
+    this.waterLights = new SkyLights(this.waterLanterns.field, layout.cssScale);
+    for (const [lanterns, lights] of [
+      [this.skyLanterns, this.skyLights],
+      [this.waterLanterns, this.waterLights],
+    ] as const) {
+      lanterns.motion = motion;
+      lanterns.existingSky = () => lights.points;
+      lanterns.onHandOff = (h) => lights.add({ seed: h.seed, sky: h.sky, status: 'rising', kind: lanterns.kind, ...(h.id ? { id: h.id } : {}) });
+    }
     this.fireflies = new Fireflies(layout, seed, motion);
     this.cozy = new Cozy(layout, seed);
     this.star = new ShootingStar(layout);
     this.star.motion = motion;
 
-    // Pixel layers, back to front. Sky lights sit above the shoreline, so the lake reflects them;
-    // water lights sit on the lake itself, in front of the reflection and behind the boat.
+    // Pixel layers, back to front (M7 merges the two M6 orders into one world). Sky lights sit above
+    // the shoreline, so the lake reflects them; water lights sit on the lake itself, in front of the
+    // reflection and behind the boat, with the drifting water lanterns in front of it.
     this.lake = new Lake(layout, this.pipeline.aboveRT);
-    if (kind === 'water') {
-      this.pipeline.above.addChild(this.staticSprite, this.overlaySprite, this.cozy.smokeSprite, this.moon.sprite, this.lanterns.aboveLayer);
-      this.pipeline.world.addChild(this.lake.container, this.skyLights.sprite, this.cozy.boatSprite, this.lanterns.nearLayer, this.shoreSprite, this.fireflies.sprite);
-    } else {
-      this.pipeline.above.addChild(this.staticSprite, this.overlaySprite, this.cozy.smokeSprite, this.skyLights.sprite, this.moon.sprite, this.lanterns.aboveLayer);
-      this.pipeline.world.addChild(this.lake.container, this.cozy.boatSprite, this.lanterns.nearLayer, this.shoreSprite, this.fireflies.sprite);
-    }
+    this.pipeline.above.addChild(
+      this.staticSprite,
+      this.overlaySprite,
+      this.cozy.smokeSprite,
+      this.skyLights.sprite,
+      this.moon.sprite,
+      this.skyLanterns.aboveLayer,
+      this.waterLanterns.aboveLayer,
+    );
+    this.pipeline.world.addChild(
+      this.lake.container,
+      this.waterLights.sprite,
+      this.cozy.boatSprite,
+      this.waterLanterns.nearLayer,
+      this.skyLanterns.nearLayer,
+      this.shoreSprite,
+      this.fireflies.sprite,
+    );
     // Light layer: light halos under the lanterns' own light, fireflies on top.
-    this.pipeline.light.addChild(this.cozy.light, this.skyLights.halos, this.lanterns.lightLayer, this.fireflies.light, this.star.container);
+    this.pipeline.light.addChild(
+      this.cozy.light,
+      this.skyLights.halos,
+      this.waterLights.halos,
+      this.skyLanterns.lightLayer,
+      this.waterLanterns.lightLayer,
+      this.fireflies.light,
+      this.star.container,
+    );
 
     this.slow = new SlowTick(SLOW_TICK_HZ, (t) => this.slowTick(t));
     this.build(layout);
   }
 
-  /** Where this scene's lights settle (normalised points map through it). */
-  get field(): Field {
-    return this.lanterns.field;
+  /** The two lantern sets, sky first. */
+  get lanternFields(): readonly [LanternField, LanternField] {
+    return [this.skyLanterns, this.waterLanterns];
+  }
+
+  lanternsOf(kind: LanternKind): LanternField {
+    return kind === 'water' ? this.waterLanterns : this.skyLanterns;
+  }
+
+  lightsOf(kind: LanternKind): SkyLights {
+    return kind === 'water' ? this.waterLights : this.skyLights;
+  }
+
+  /** Where a kind's lights settle (normalised points map through it). */
+  fieldOf(kind: LanternKind): Field {
+    return this.lanternsOf(kind).field;
+  }
+
+  /** The lantern waiting to be lit, of either kind (at most one at a time). */
+  get resting(): Lantern | null {
+    return this.skyLanterns.resting ?? this.waterLanterns.resting;
+  }
+
+  /** Every lantern on its way, both kinds. */
+  get rising(): Lantern[] {
+    return [...this.skyLanterns.rising, ...this.waterLanterns.rising];
+  }
+
+  /** Every active lantern, both kinds. */
+  get activeLanterns(): Lantern[] {
+    return [...this.skyLanterns.lanterns, ...this.waterLanterns.lanterns];
+  }
+
+  /** Every settled light, both kinds, sky first. */
+  get allLights(): readonly SkyLight[] {
+    return [...this.skyLights.lights, ...this.waterLights.lights];
+  }
+
+  /** Put a settled light back in the sky it belongs to. */
+  addLight(light: SkyLight): void {
+    this.lightsOf(light.kind).add(light);
+  }
+
+  clearLights(): void {
+    this.skyLights.clear();
+    this.waterLights.clear();
+  }
+
+  /** A return changed a stored lantern: whichever sky it is in. */
+  setLightStatus(id: string, status: SkyLight['status']): void {
+    this.skyLights.setStatus(id, status);
+    this.waterLights.setStatus(id, status);
+  }
+
+  /**
+   * Release a lit lantern. The twelve-lantern budget (SPEC section 8) counts
+   * both kinds together, so the oldest one on its way settles when a
+   * thirteenth is released, whichever kind it is.
+   */
+  release(l: Lantern): boolean {
+    const rising = this.rising;
+    if (rising.length >= MAX_ACTIVE) {
+      const oldest = rising[0]!;
+      this.lanternsOf(oldest.kind).settleNow(oldest);
+    }
+    return this.lanternsOf(l.kind).release(l);
+  }
+
+  /** The released lantern is far enough along for the watch buttons. */
+  wellOnItsWay(l: Lantern): boolean {
+    return this.lanternsOf(l.kind).wellOnItsWay(l);
   }
 
   build(layout: Layout): void {
@@ -150,15 +251,16 @@ export class Scene {
   setQuality(level: QualityLevel): void {
     this.quality = level;
     this.skyLights.setQuality(level);
+    this.waterLights.setQuality(level);
     this.fireflies.setQuality(level);
     this.cozy.setQuality(level);
     this.moon.setQuality(level);
-    this.lanterns.setQuality(level);
+    for (const f of this.lanternFields) f.setQuality(level);
   }
 
   /** Settings or the system changed the motion level. */
   setMotion(motion: MotionLevel): void {
-    this.lanterns.motion = motion;
+    for (const f of this.lanternFields) f.motion = motion;
     this.star.motion = motion;
     this.fireflies.build(this.layout, motion);
   }
@@ -168,8 +270,9 @@ export class Scene {
     this.pipeline.resize(layout);
     this.star.resize(layout);
     this.lake.build(layout, this.pipeline.aboveRT);
-    this.lanterns.resize(layout);
-    this.skyLights.resize(this.lanterns.field, layout.cssScale);
+    for (const f of this.lanternFields) f.resize(layout);
+    this.skyLights.resize(this.skyLanterns.field, layout.cssScale);
+    this.waterLights.resize(this.waterLanterns.field, layout.cssScale);
     this.fireflies.build(layout, motion);
     this.build(layout);
   }
@@ -185,8 +288,9 @@ export class Scene {
     const tSec = this.timeMs / 1000;
     this.slow.advance(dt);
     this.lake.update(this.timeMs);
-    this.lanterns.update(dt / 1000, tSec);
+    for (const f of this.lanternFields) f.update(dt / 1000, tSec);
     this.skyLights.update(tSec);
+    this.waterLights.update(tSec);
     this.fireflies.update(dt / 1000, tSec);
     this.cozy.update(tSec);
     this.starDone = this.star.update(dt / 1000);
@@ -195,12 +299,15 @@ export class Scene {
 
   /** Tear down this scene (a scene swap, or the offscreen share render). Sprite sets and cached light textures are shared and kept. */
   destroy(): void {
-    for (const l of [...this.lanterns.lanterns]) l.destroy();
-    this.lanterns.lanterns.length = 0;
+    for (const f of this.lanternFields) {
+      for (const l of [...f.lanterns]) l.destroy();
+      f.lanterns.length = 0;
+    }
     this.staticBuf.destroy();
     this.overlayBuf.destroy();
     this.shoreBuf.destroy();
     this.skyLights.destroy();
+    this.waterLights.destroy();
     this.moon.destroy();
     this.lake.destroy();
     this.pipeline.destroy();
@@ -228,6 +335,7 @@ export class Scene {
     o.upload();
     this.lake.slowTick(tick);
     this.skyLights.drawTick(tick);
+    this.waterLights.drawTick(tick);
     this.fireflies.drawTick(tick);
     this.cozy.drawTick(tick);
   }

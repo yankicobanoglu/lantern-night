@@ -39,23 +39,25 @@ test.describe('Your sky', () => {
 });
 
 test.describe('Settings', () => {
-  test('stores sound, gentle motion and text size', async ({ page }, testInfo) => {
+  test('stores sound and text size, and gentle motion is on with no way to turn it off', async ({ page }, testInfo) => {
     await openRitual(page, QUIET);
     await openMenu(page, 'Settings');
     await saveScreenshots(page, testInfo, 'settings');
+    // M7: the motion row and the scene row are gone. Two settings are left.
+    await expect(page.getByRole('switch', { name: 'Gentle motion' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Sky lanterns' })).toHaveCount(0);
+    expect(await page.evaluate(() => document.getElementById('ui')!.classList.contains('gentle'))).toBe(true);
     await page.getByRole('switch', { name: 'Sound' }).click();
-    await page.getByRole('switch', { name: 'Gentle motion' }).click();
     await page.getByRole('button', { name: 'Text size largest' }).click();
-    await expect.poll(() => readIdb(page, 'settings')).toMatchObject({ sound: false, motion: 'gentle', textScale: 1.3 });
+    await expect.poll(() => readIdb(page, 'settings')).toMatchObject({ sound: false, textScale: 1.3 });
     const rootPx = (): Promise<number> => page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize));
     expect(await rootPx()).toBeCloseTo(20.8, 3);
-    expect(await page.evaluate(() => document.getElementById('ui')!.classList.contains('gentle'))).toBe(true);
-    // Survives a reload.
+    // Survives a reload, and motion is still gentle.
     await openRitual(page, QUIET);
     expect(await rootPx()).toBeCloseTo(20.8, 3);
+    expect(await page.evaluate(() => document.getElementById('ui')!.classList.contains('gentle'))).toBe(true);
     await openMenu(page, 'Settings');
     await expect(page.getByRole('switch', { name: 'Sound' })).toHaveAttribute('aria-checked', 'false');
-    await expect(page.getByRole('switch', { name: 'Gentle motion' })).toHaveAttribute('aria-checked', 'true');
   });
 
   test('clear my sky asks first, then removes every lantern', async ({ page }) => {

@@ -37,6 +37,9 @@ export const COPY = {
     modeWish: 'Make a wish',
     modeLetGo: 'Let something go',
     fold: 'Fold my lantern',
+    /** The kind of lantern (not in the deck; proposed in PLAN-M7). Both kinds share one night. */
+    kindLabel: 'Kind of lantern',
+    kinds: { sky: 'Sky lantern', water: 'Water lantern' },
   },
   light: {
     idle: 'Hold to light your lantern',
@@ -54,7 +57,7 @@ export const COPY = {
     lightAnother: 'Light another',
     goodnight: 'Goodnight',
   },
-  /** Water scene (not in the deck; proposed in PLAN-M6): the deck's "let it rise" reads wrong for a lantern on the water. */
+  /** Water lanterns (not in the deck; proposed in PLAN-M6): the deck's "let it rise" reads wrong for a lantern on the water. */
   water: {
     lit: 'Beautiful. Now breathe out, and let it drift.',
     letItDrift: 'Let it drift',
@@ -115,7 +118,10 @@ export const COPY = {
     /** Mute toggle labels (not in the deck; proposed in PLAN-M4). */
     soundOn: 'Sound on',
     soundOff: 'Sound off',
-    /** Scene row (not in the deck; proposed in PLAN-M6 for ROADMAP 4.1). */
+    /**
+     * Unused since M7: the kind of lantern is chosen on the wish screen, and
+     * gentle motion is always on. The strings stay because the deck is SPEC's.
+     */
     scene: 'Scene',
     scenes: { sky: 'Sky lanterns', water: 'Water lanterns' },
     /** Small print at the foot of Settings (not in the deck; proposed after the M5 review). */
@@ -126,6 +132,8 @@ export const COPY = {
     includeWish: 'Include my wish',
     /** Text beside the shared image (not in the deck; proposed after the M5 review). */
     text: (url: string) => `Light a lantern. Let it rise. ${url}`,
+    /** One-time hint pointing at the corner share button, after the first lantern (not in the deck; proposed in PLAN-M7). */
+    hint: 'Tap here to share your sky.',
   },
   system: {
     storageUnavailable: "Your lanterns can't be saved in this browser mode. They'll still rise tonight.",

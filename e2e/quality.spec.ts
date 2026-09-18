@@ -62,7 +62,7 @@ test.describe('adaptive quality (SPEC section 8)', () => {
     expect(q.level).toBe(1);
     expect(q.lanternBloom).toEqual([false, false]);
     expect(q.moonHalo).toBe(false);
-    await page.evaluate(() => window.__lantern!.scene.lanterns.spawnRising(0.3));
+    await page.evaluate(() => window.__lantern!.scene.lanternsOf('sky').spawnRising(0.3));
     await page.waitForTimeout(100);
     q = await quality(page);
     expect(q.lanternBloom).toEqual([false, false, false]);

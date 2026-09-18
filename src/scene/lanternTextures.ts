@@ -1,6 +1,6 @@
 import { Texture } from 'pixi.js';
 import { PixelBuffer } from '../engine/pixelBuffer';
-import type { SceneKind } from './field';
+import type { LanternKind } from './field';
 import {
   DOT,
   FRAMES,
@@ -20,6 +20,7 @@ import {
   skyLightMap,
   smallLanternMap,
 } from './sprites/lantern';
+import { waterLightMap, WATER_LIGHT_H, WATER_LIGHT_PALETTE, WATER_LIGHT_W } from './sprites/waterLight';
 import {
   smallWaterLanternMap,
   WATER_BIG_H,
@@ -44,7 +45,7 @@ export type StageSize = { w: number; h: number };
  * Built once per kind and shared by every scene (ROADMAP 2.5): never destroyed.
  */
 export type LanternSpriteSet = {
-  kind: SceneKind;
+  kind: LanternKind;
   sizes: Record<StageName, StageSize>;
   /** Where the core bloom sits relative to the sprite centre, art px down (the flame's height). */
   coreDy: Record<StageName, number>;
@@ -97,7 +98,18 @@ function skyLanternSet(): LanternSpriteSet {
   };
 }
 
-/** The water lantern (ROADMAP 4.1): 20×15 at rest, 14×10, 7×5, then the same 4×4 dot. */
+/** Its last stage before it settles: the water light, not the sky lantern's dot (M7). */
+function waterDots(): Texture[] {
+  const out: Texture[] = [];
+  for (let f = 0; f < 2; f++) {
+    const buf = new PixelBuffer(WATER_LIGHT_W, WATER_LIGHT_H);
+    buf.blit(waterLightMap('rising', f), WATER_LIGHT_PALETTE, 0, 0);
+    out.push(buf.toTexture());
+  }
+  return out;
+}
+
+/** The water lantern (ROADMAP 4.1): 20×15 at rest, 14×10, 7×5, then the 6×5 water light it settles as. */
 function waterLanternSet(): LanternSpriteSet {
   const large: Texture[][] = [];
   const big: Texture[][] = [];
@@ -114,19 +126,24 @@ function waterLanternSet(): LanternSpriteSet {
   const clamp = (fill: number): number => Math.max(0, Math.min(1, fill));
   return {
     kind: 'water',
-    sizes: { large: { w: WATER_LARGE_W, h: WATER_LARGE_H }, big: { w: WATER_BIG_W, h: WATER_BIG_H }, small: { w: WATER_SMALL_W, h: WATER_SMALL_H }, dot: { w: DOT, h: DOT } },
+    sizes: {
+      large: { w: WATER_LARGE_W, h: WATER_LARGE_H },
+      big: { w: WATER_BIG_W, h: WATER_BIG_H },
+      small: { w: WATER_SMALL_W, h: WATER_SMALL_H },
+      dot: { w: WATER_LIGHT_W, h: WATER_LIGHT_H },
+    },
     coreDy: { large: -1, big: -1, small: 0, dot: 0 },
     largeFor: (frame, fill) => large[frame % WATER_FRAMES]?.[Math.round(clamp(fill) * WATER_PAPER.large.rows)] ?? Texture.EMPTY,
     bigFor: (frame, fill) => big[frame % WATER_FRAMES]?.[Math.round(clamp(fill) * WATER_PAPER.big.rows)] ?? Texture.EMPTY,
     small,
-    dot: dots(),
+    dot: waterDots(),
   };
 }
 
-const sets = new Map<SceneKind, LanternSpriteSet>();
+const sets = new Map<LanternKind, LanternSpriteSet>();
 
 /** The shared sprite set for a scene kind, built on first use. */
-export function lanternSpriteSet(kind: SceneKind): LanternSpriteSet {
+export function lanternSpriteSet(kind: LanternKind): LanternSpriteSet {
   let set = sets.get(kind);
   if (!set) {
     set = kind === 'water' ? waterLanternSet() : skyLanternSet();

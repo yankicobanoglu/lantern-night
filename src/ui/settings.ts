@@ -1,6 +1,4 @@
-import type { MotionLevel } from '../engine/motion';
 import { COPY } from '../ritual/copy';
-import { SCENE_KINDS, type SceneKind } from '../scene/field';
 import type { Settings } from '../store/types';
 import { button, el } from './dom';
 import { focusFirst } from './focus';
@@ -13,13 +11,15 @@ export type SettingsHandlers = {
   onClose: () => void;
 };
 
-/** Settings sheet (SPEC section 4, Settings; the Scene row is ROADMAP 4.1). */
+/**
+ * Settings sheet (SPEC section 4, Settings). Two rows left in M7: gentle motion
+ * is always on and is no longer a choice, and the kind of lantern is chosen on
+ * the wish screen instead of here.
+ */
 export class SettingsSheet {
   readonly node: HTMLElement;
   private readonly sound: HTMLButtonElement;
-  private readonly motion: HTMLButtonElement;
   private readonly sizes: HTMLButtonElement[];
-  private readonly scenes: HTMLButtonElement[];
   private readonly confirm: HTMLElement;
   private readonly file: HTMLInputElement;
 
@@ -34,18 +34,11 @@ export class SettingsSheet {
       return b;
     };
     this.sound = sw(COPY.settings.sound, (on) => handlers.onChange({ sound: on }));
-    this.motion = sw(COPY.settings.motion, (on) => handlers.onChange({ motion: on ? 'gentle' : 'full' }));
     this.sizes = ([1, 1.15, 1.3] as const).map((scale) =>
       button('A', 'ghost', () => {
         handlers.onChange({ textScale: scale });
         this.markSize(scale);
       }, { 'aria-label': `${COPY.settings.textSize} ${scale === 1 ? 'normal' : scale === 1.15 ? 'larger' : 'largest'}`, 'aria-pressed': 'false' }),
-    );
-    this.scenes = SCENE_KINDS.map((kind) =>
-      button(COPY.settings.scenes[kind], 'ghost small', () => {
-        handlers.onChange({ scene: kind });
-        this.markScene(kind);
-      }, { 'aria-pressed': 'false', 'data-scene': kind }),
     );
     this.file = el('input', { type: 'file', class: 'file', accept: '.json,application/json', 'aria-label': COPY.settings.restore, tabindex: -1 });
     this.file.addEventListener('change', () => {
@@ -72,9 +65,7 @@ export class SettingsSheet {
       el('div', { class: 'sheet panel' }, [
         el('h2', { text: COPY.settings.heading }),
         row(COPY.settings.sound, this.sound),
-        row(COPY.settings.motion, this.motion),
         row(COPY.settings.textSize, el('div', { class: 'sizes' }, this.sizes)),
-        row(COPY.settings.scene, el('div', { class: 'scenes', role: 'group', 'aria-label': COPY.settings.scene }, this.scenes)),
         el('p', { class: 'line muted', text: COPY.settings.backupHelper }),
         el('div', { class: 'row' }, [
           button(COPY.settings.save, 'ghost small', () => handlers.onSave()),
@@ -103,15 +94,9 @@ export class SettingsSheet {
     this.sizes.forEach((b, i) => b.setAttribute('aria-pressed', String(scales[i] === scale)));
   }
 
-  private markScene(kind: SceneKind): void {
-    this.scenes.forEach((b, i) => b.setAttribute('aria-pressed', String(SCENE_KINDS[i] === kind)));
-  }
-
-  show(settings: Settings, effectiveMotion: MotionLevel): void {
+  show(settings: Settings): void {
     this.sound.setAttribute('aria-checked', String(settings.sound));
-    this.motion.setAttribute('aria-checked', String(effectiveMotion === 'gentle'));
     this.markSize(settings.textScale);
-    this.markScene(settings.scene);
     this.confirm.hidden = true;
     this.node.classList.add('on');
     focusFirst(this.node);
@@ -121,11 +106,6 @@ export class SettingsSheet {
   /** The mute toggle changed the setting: keep the switch in step. */
   setSound(on: boolean): void {
     this.sound.setAttribute('aria-checked', String(on));
-  }
-
-  /** The scene in use (a `?scene=` pin can differ from the stored one): keep the choice in step. */
-  setScene(kind: SceneKind): void {
-    this.markScene(kind);
   }
 
   get isOpen(): boolean {

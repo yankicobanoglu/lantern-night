@@ -4,7 +4,7 @@ import type { Layout } from '../engine/layout';
 import type { MotionLevel } from '../engine/motion';
 import type { QualityLevel } from '../engine/quality';
 import { WindField, type Wind } from '../engine/wind';
-import { fieldFor, fieldToArt, pickFieldPoint, type Field, type SceneKind } from './field';
+import { fieldFor, fieldToArt, pickFieldPoint, type Field, type LanternKind } from './field';
 import { Lantern, type LanternLayers } from './lantern';
 import type { RiseOptions } from './lanternPhysics';
 import { lanternSpriteSet, type LanternSpriteSet } from './lanternTextures';
@@ -37,7 +37,7 @@ export class LanternField {
   constructor(
     private layout: Layout,
     seed: number,
-    readonly kind: SceneKind = 'sky',
+    readonly kind: LanternKind = 'sky',
   ) {
     this.wind = new WindField(seed, 4);
     this.nextSeed = (seed * 7919 + 17) >>> 0;

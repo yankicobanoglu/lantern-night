@@ -420,6 +420,10 @@ textarea:focus-visible {
     0 0 10px rgba(255, 181, 71, 0.8),
     0 1px 10px rgba(27, 27, 58, 0.95);
 }
+/* The kind of lantern, under the chips: two pills, like the mode toggle above (M7). */
+.row.kinds {
+  gap: 8px;
+}
 /* Small pills at the very bottom, clear of the lantern and of where people press. */
 .actions {
   position: absolute;
@@ -508,6 +512,37 @@ textarea:focus-visible {
   right: 10px;
   color: var(--cream);
   z-index: 3;
+}
+/* Sharing sits beside the mute toggle (M7), so the watch row is just Light another and Goodnight. */
+.corner.share-sky {
+  left: auto;
+  right: 62px;
+  color: var(--cream);
+  z-index: 3;
+}
+/* One line under that button, pointing at it once: no panel, no border. */
+.corner-hint {
+  position: absolute;
+  top: calc(58px + var(--safe-top));
+  right: 12px;
+  margin: 0;
+  max-width: 62vw;
+  text-align: right;
+  font-size: 0.82rem;
+  color: var(--cream);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgba(27, 27, 58, 0.95);
+  transition:
+    opacity 600ms var(--ease),
+    visibility 0s linear 600ms;
+  z-index: 3;
+}
+.corner-hint.on {
+  opacity: 0.92;
+  visibility: visible;
+  transition-delay: 0s;
 }
 .corner.mute .slash {
   display: none;
@@ -716,8 +751,7 @@ textarea:focus-visible {
 .switch[aria-checked='true']::after {
   transform: translateX(22px);
 }
-.sizes,
-.scenes {
+.sizes {
   display: flex;
   gap: 6px;
 }

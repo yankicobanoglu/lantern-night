@@ -10,7 +10,7 @@ import { QualityGovernor } from './engine/quality';
 import { FrameStats } from './engine/ticker';
 import { Session } from './ritual/session';
 import { pickFieldPoint } from './scene/field';
-import { SceneHost } from './scene/host';
+import { Scene } from './scene/scene';
 import { openKv } from './store/kv';
 import { Store } from './store/store';
 import { captureInstallPrompt } from './ui/install';
@@ -33,27 +33,30 @@ async function boot(): Promise<void> {
   const cpu = new FrameStats();
 
   let layout = computeLayout(window.innerWidth, window.innerHeight, app.renderer.resolution);
-  // The scene host owns the live scene; the Scene setting swaps it once the store has loaded (ROADMAP 4.1).
-  const host = new SceneHost(app.renderer, app.stage, layout, opts.seed, motion(), opts.scene ?? 'sky');
-  host.scene.setMoonFrame(frameForNow(opts));
-  host.scene.moon.setSupermoon(supermoonForNow(opts));
+  // One world holding both kinds of lantern (M7): the wish screen chooses which one is folded next.
+  const scene = new Scene(app.renderer, app.stage, layout, opts.seed, motion());
+  scene.setMoonFrame(frameForNow(opts));
+  scene.moon.setSupermoon(supermoonForNow(opts));
   // Adaptive quality (SPEC section 8): starts full, steps down when frames run long; ?quality= pins it.
   const governor = new QualityGovernor(opts.quality);
-  host.scene.setQuality(governor.level);
+  scene.setQuality(governor.level);
 
   // Test hooks: pre-seeded sky and lanterns already rising.
+  // Test hooks: pre-seeded lights and lanterns of the pinned kind (?scene=), sky by default.
+  const testKind = opts.scene ?? 'sky';
   for (let i = 0; i < opts.skyLights; i++) {
     const seed = (opts.seed * 1000 + i * 7919) >>> 0;
-    host.scene.skyLights.add({ seed, sky: pickFieldPoint(seed, host.scene.field, host.scene.skyLights.points), status: 'rising' });
+    const lights = scene.lightsOf(testKind);
+    lights.add({ seed, sky: pickFieldPoint(seed, scene.fieldOf(testKind), lights.points), status: 'rising', kind: testKind });
   }
-  for (let i = 0; i < opts.risingLanterns; i++) host.scene.lanterns.spawnRising((i + 0.5) / (opts.risingLanterns + 1) * 0.8);
+  for (let i = 0; i < opts.risingLanterns; i++) scene.lanternsOf(testKind).spawnRising((i + 0.5) / (opts.risingLanterns + 1) * 0.8);
 
   const store = new Store(await openKv());
   const audio = new AudioEngine();
   const session = new Session({
     root: uiRoot,
     canvas,
-    host,
+    scene,
     store,
     audio,
     renderer: app.renderer,
@@ -68,7 +71,7 @@ async function boot(): Promise<void> {
     sceneOverride: opts.scene,
   });
 
-  installDebug(app, host, session, store, audio, stats, cpu, governor, () => layout);
+  installDebug(app, scene, session, store, audio, stats, cpu, governor, () => layout);
   if (opts.showFps) mountFpsOverlay(stats, cpu, governor);
 
   let resizeTimer = 0;
@@ -94,8 +97,8 @@ async function boot(): Promise<void> {
       appliedH = h;
       app.renderer.resize(w, h);
       layout = computeLayout(w, h, app.renderer.resolution);
-      host.scene.resize(layout, session.motion());
-      host.scene.setMoonFrame(frameForNow(opts));
+      scene.resize(layout, session.motion());
+      scene.setMoonFrame(frameForNow(opts));
       session.resize(layout);
       governor.reset();
     }, 80);
@@ -123,9 +126,9 @@ async function boot(): Promise<void> {
       // A home-screen web app on iOS can report the wrong height at launch without a resize event: check every frame.
       if (window.innerWidth !== appliedW || window.innerHeight !== appliedH) onResize();
       stats.push(ticker.deltaMS);
-      if (governor.push(ticker.deltaMS)) host.scene.setQuality(governor.level);
+      if (governor.push(ticker.deltaMS)) scene.setQuality(governor.level);
       const t0 = performance.now();
-      host.scene.update(ticker.deltaMS);
+      scene.update(ticker.deltaMS);
       session.update(ticker.deltaMS);
       cpu.push(performance.now() - t0);
       if (window.__lantern && !window.__lantern.ready) {

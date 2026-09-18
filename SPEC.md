@@ -36,10 +36,10 @@ States run as a simple state machine: `arrive → (return) → intention → lig
 
 1. **Arrive.** The scene fades in at blue hour. A moon-phase banner appears on new/full moons (section 5). Button: *Begin*.
 2. **Return (only if one is due).** At most one per session, oldest first (section 6).
-3. **Intention.** Mode toggle *Make a wish* / *Let something go*. Text field (max 120 characters) and prompt chips.
+3. **Intention.** Mode toggle *Make a wish* / *Let something go*. Text field (max 120 characters), prompt chips, and the kind of lantern (M7): a sky lantern that rises, or a water lantern that drifts out on the lake. Both kinds share one night, and a lantern keeps its kind for good.
 4. **Light.** Press and hold for 4 s while a breath guide expands. The flame grows and the lantern fills. Tap alternative available (accessibility, reduced motion).
 5. **Release.** Swipe up (or tap *Let it rise*). The lantern lifts, the written text glows and fades as it rises.
-6. **Watch.** The lantern drifts on the wind, shrinks with height and settles into the sky as a small light. After ~6 s the buttons *Light another* and *Goodnight* fade in.
+6. **Watch.** The lantern drifts on the wind, shrinks with height and settles into the sky as a small light. After ~6 s the buttons *Light another* and *Goodnight* fade in, side by side. Sharing is a corner button beside the mute toggle (M7), pointed at once by a small line after the first lantern.
 7. **Goodnight.** Short closing line, scene dims gently. Session ends.
 
 **Shooting star event:** during arrive/watch, a shooting star crosses the sky at a random interval of 45–120 s. On a first-ever session, one appears within the first 60 s so people discover it. Tapping it shows a small sparkle and a line of copy. No input, nothing stored. Look and timing are in section 7 under "Legibility".
@@ -117,7 +117,7 @@ Use these strings exactly unless a better line is clearly warmer and shorter.
 - Tapping a light shows the date and the wish text.
 
 **Settings**
-- "Sound", "Gentle motion", "Text size", "Save a backup", "Restore from backup", "Clear my sky"
+- "Sound", "Text size", "Save a backup", "Restore from backup", "Clear my sky" (M7: gentle motion is always on and is no longer a row; the kind of lantern is chosen on the wish screen)
 - Backup helper: "Your sky lives on this device. Save a backup now and then to keep it safe."
 - After saving: "Backup saved."
 - After restoring: "Your sky is back." (with count: "{n} lanterns restored")
@@ -163,13 +163,14 @@ type Lantern = {
   createdAt: string;     // ISO
   returnAt: string;      // createdAt + 30 days
   status: 'rising' | 'came-true' | 'still-growing' | 'let-go';
-  sky: { x: number; y: number }; // normalised 0–1 position in the sky layer
+  sky: { x: number; y: number }; // normalised 0–1 position in its kind's field
   seed: number;          // small visual variation (hue, twinkle)
+  kind: 'sky' | 'water'; // added in M7; a record without it reads as 'sky'
 };
 
 type Settings = {
   sound: boolean;                       // default true, audio starts after first tap
-  motion: 'system' | 'gentle' | 'full'; // 'system' follows prefers-reduced-motion
+  motion: 'system' | 'gentle' | 'full'; // kept for old data; since M7 the app always runs gentle
   textScale: 1 | 1.15 | 1.3;
   sessions: number;
   installHintCount: number;             // how many times the install hint has been shown

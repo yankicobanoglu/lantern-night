@@ -79,7 +79,10 @@ test.describe('lanterns', () => {
     await page.mouse.up();
     await page.waitForFunction(() => window.__lantern!.lanterns().some((l) => l.phase === 'rising'), undefined, { timeout: 2000 });
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
-    await expect(page.locator('#ui .hint')).toHaveText('There it goes.');
+    // The caption says "There it goes." and becomes the mode's line 1.8 s later on the wall clock, so on a
+    // slow machine the first line can be gone by the time this reads it: either is right here, and the
+    // line it settles on is asserted exactly below.
+    expect(await page.locator('#ui .hint').textContent()).toMatch(/^(There it goes\.|Your light is on its way\.)$/);
     await page.waitForTimeout(2500);
     await expect(page.locator('#ui .hint')).toHaveText('Your light is on its way.');
     const mid = await page.evaluate(() => window.__lantern!.lanterns().find((l) => l.phase === 'rising')!);

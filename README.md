@@ -61,9 +61,9 @@ If the mean frame time stays above 20 ms for 2 s the scene steps down a level: f
 
 Over the first three minutes the horizon eases from apricot to plum: the three warm sky bands give up their height in turn and the night band grows. The share image is composed at the same point of the arc.
 
-### Scenes
+### Two kinds of lantern
 
-Settings has a Scene row. **Sky lanterns** is the ritual as specified: the lantern rises from the shore and settles in the sky. **Water lanterns** plays in the same world with a floating paper lantern that drifts out across the lake and settles as a light on the water. A stored lantern keeps one normalised point; each scene interprets it through its own field (the sky band, or the far half of the lake), so the same sky shows in either scene and backups are unchanged. Changing the scene swaps the world live and carries every light over. `src/scene/field.ts` holds the fields, `src/scene/host.ts` the swap.
+The wish screen asks which lantern to fold. A **sky lantern** rises from the shore and settles among the stars; a **water lantern** is a floating paper lantern that drifts out across the lake and settles as a light on the water, with its own flatter shape and a reflection under it. Both live in the same night: the kind belongs to the lantern, not to the evening, so lighting one never moves the others. Each kind has its own field (the sky band above the horizon, the far half of the lake) through which a stored point is read, so backups are unchanged and a record written before this reads as a sky lantern. The choice is remembered as the default for the next one. `src/scene/field.ts` holds the fields, `src/scene/scene.ts` the layer order.
 
 ### Real-night events
 
@@ -80,12 +80,12 @@ All of these are for tests and screenshots; none change what a visitor sees by d
 | `?seed=N` | scene seed |
 | `?lanterns=N` | N lit lanterns already rising (up to 12) |
 | `?sky=N` | N past lanterns in the sky (up to 1,000) |
-| `?motion=gentle\|full` | override the motion setting |
+| `?motion=gentle\|full` | override the motion level (the app always runs gentle) |
 | `?star=now` | a shooting star right away |
 | `?install=ios\|prompt` | force an install-hint path |
 | `?quality=1\|2\|3` | pin the quality level (the governor is off) |
 | `?evening=0..1` | pin the session light arc |
-| `?scene=sky\|water` | pin the scene at boot (the Scene setting still swaps it) |
+| `?scene=sky\|water` | pin the kind the wish screen starts on, and the kind test lights are seeded as |
 | `?supermoon` | draw the larger moon regardless of the date |
 | `?debug` | fps, frame and CPU times, quality level overlay |
 

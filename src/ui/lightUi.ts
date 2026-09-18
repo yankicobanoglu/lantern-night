@@ -1,7 +1,7 @@
 import { HOLD_MS } from '../config';
 import type { MotionLevel } from '../engine/motion';
 import { COPY, type Mode } from '../ritual/copy';
-import type { SceneKind } from '../scene/field';
+import type { LanternKind } from '../scene/field';
 import { button, el } from './dom';
 import { focusFirst } from './focus';
 
@@ -22,15 +22,14 @@ export class LightUi {
   private readonly releaseBtn: HTMLButtonElement;
   private readonly anotherBtn: HTMLButtonElement;
   private readonly goodnightBtn: HTMLButtonElement;
-  private readonly shareBtn: HTMLButtonElement;
   private hintTimer = 0;
   private side: 'left' | 'right' = 'left';
-  private kind: SceneKind = 'sky';
+  private kind: LanternKind = 'sky';
 
   constructor(
     root: HTMLElement,
     motion: MotionLevel,
-    handlers: { onLightTap: () => void; onRelease: () => void; onAnother: () => void; onGoodnight: () => void; onShare: () => void },
+    handlers: { onLightTap: () => void; onRelease: () => void; onAnother: () => void; onGoodnight: () => void },
   ) {
     this.root = root;
     this.ring = el('div', { class: 'breath', 'aria-hidden': 'true' });
@@ -38,10 +37,11 @@ export class LightUi {
     this.wish = el('p', { class: 'wish', 'aria-hidden': 'true' });
     this.lightBtn = button(COPY.light.tapAlternative, 'ghost small', handlers.onLightTap, { 'data-action': 'light' });
     this.releaseBtn = button(COPY.release.letItRise, 'primary small', handlers.onRelease, { 'data-action': 'release' });
-    this.anotherBtn = button(COPY.release.lightAnother, 'primary small', handlers.onAnother, { 'data-action': 'another' });
+    // Light another is the one you reach for, so it is a full-size primary button; Goodnight sits
+    // beside it as a small ghost (M7). Sharing moved to the corner button.
+    this.anotherBtn = button(COPY.release.lightAnother, 'primary', handlers.onAnother, { 'data-action': 'another' });
     this.goodnightBtn = button(COPY.release.goodnight, 'ghost small', handlers.onGoodnight, { 'data-action': 'goodnight' });
-    this.shareBtn = button(COPY.share.button, 'ghost small', handlers.onShare, { 'data-action': 'share' });
-    this.actions = el('div', { class: 'actions' }, [this.lightBtn, this.releaseBtn, this.anotherBtn, this.goodnightBtn, this.shareBtn]);
+    this.actions = el('div', { class: 'actions' }, [this.lightBtn, this.releaseBtn, this.anotherBtn, this.goodnightBtn]);
     this.stage = el('div', { class: 'stage' }, [this.ring, this.hint, this.wish, this.actions]);
     root.append(this.stage);
     this.ring.style.transitionDuration = `${HOLD_MS}ms`;
@@ -53,8 +53,8 @@ export class LightUi {
     this.root.classList.toggle('gentle', motion === 'gentle');
   }
 
-  /** The scene decides the release wording: a sky lantern rises, a water lantern drifts (ROADMAP 4.1). */
-  setSceneKind(kind: SceneKind): void {
+  /** The lantern decides the release wording: a sky lantern rises, a water lantern drifts (M7). */
+  setKind(kind: LanternKind): void {
     this.kind = kind;
     this.releaseBtn.textContent = kind === 'water' ? COPY.water.letItDrift : COPY.release.letItRise;
   }
@@ -107,7 +107,7 @@ export class LightUi {
   }
 
   private showButtons(...visible: HTMLButtonElement[]): void {
-    for (const b of [this.lightBtn, this.releaseBtn, this.anotherBtn, this.goodnightBtn, this.shareBtn]) b.hidden = !visible.includes(b);
+    for (const b of [this.lightBtn, this.releaseBtn, this.anotherBtn, this.goodnightBtn]) b.hidden = !visible.includes(b);
     this.actions.dataset['empty'] = String(visible.length === 0);
     this.actions.classList.remove('fade-in');
   }
@@ -168,7 +168,7 @@ export class LightUi {
     this.stage.dataset['state'] = 'watch';
     window.clearTimeout(this.hintTimer);
     this.say(COPY.release.watch);
-    this.showButtons(this.anotherBtn, this.goodnightBtn, this.shareBtn);
+    this.showButtons(this.anotherBtn, this.goodnightBtn);
     this.actions.classList.add('fade-in');
     focusFirst(this.actions);
   }

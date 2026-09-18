@@ -1,4 +1,4 @@
-import { isLantern, type Lantern, type Settings } from './types';
+import { readLanterns, type Lantern, type Settings } from './types';
 
 /** SPEC section 6 backup file. */
 export type Backup = {
@@ -30,7 +30,7 @@ export function parseBackup(text: string): Backup | null {
   const o = v as Record<string, unknown>;
   if (o['app'] !== 'lantern-night' || o['version'] !== 1) return null;
   if (!Array.isArray(o['lanterns'])) return null;
-  const lanterns = o['lanterns'].filter(isLantern);
+  const lanterns = readLanterns(o['lanterns']);
   const settings = (typeof o['settings'] === 'object' && o['settings'] !== null ? o['settings'] : {}) as Settings;
   return { app: 'lantern-night', version: 1, exportedAt: String(o['exportedAt'] ?? ''), lanterns, settings };
 }

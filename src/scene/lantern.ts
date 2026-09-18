@@ -6,6 +6,7 @@ import { hash01 } from '../engine/rng';
 import type { Wind } from '../engine/wind';
 import { PALETTE } from '../palette';
 import { sizeStage, stepRise, type RiseOptions, type RiseState } from './lanternPhysics';
+import type { LanternKind } from './field';
 import type { LanternSpriteSet, StageName } from './lanternTextures';
 import type { SkyPoint } from './skyPoint';
 
@@ -53,6 +54,11 @@ export class Lantern {
   private readonly streak: Sprite;
   private stage: StageName = 'large';
   private rest: { x: number; y: number };
+
+  /** Which kind this lantern is (M7): its sprite set says so, and it never changes. */
+  get kind(): LanternKind {
+    return this.set.kind;
+  }
 
   constructor(
     readonly seed: number,

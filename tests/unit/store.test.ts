@@ -16,16 +16,55 @@ function lantern(over: Partial<Lantern> = {}): Lantern {
     status: 'rising',
     sky: { x: 0.3, y: 0.2 },
     seed: 7,
+    kind: 'sky',
     ...over,
   };
 }
+
+describe('the lantern kind (M7)', () => {
+  it('a record written before M7 has no kind and reads as a sky lantern', async () => {
+    const kv = memoryKv();
+    const { kind: _drop, ...old } = lantern({ id: 'old' });
+    await kv.set(LANTERNS_KEY, [old]);
+    const s = new Store(kv);
+    await s.load();
+    expect(s.lanterns).toHaveLength(1);
+    expect(s.lanterns[0]!.kind).toBe('sky');
+  });
+
+  it('keeps the kind it was lit as, through the store and a backup round trip', async () => {
+    const kv = memoryKv();
+    const s = new Store(kv);
+    await s.load();
+    const water = await s.add({ text: 'I am welcoming calm', sky: { x: 0.4, y: 0.3 }, seed: 5, kind: 'water', now });
+    const sky = await s.add({ text: 'I trust that it works out', sky: { x: 0.6, y: 0.2 }, seed: 6, kind: 'sky', now });
+    expect([water.kind, sky.kind]).toEqual(['water', 'sky']);
+    const text = serializeBackup(s.lanterns, DEFAULT_SETTINGS, now);
+    const back = parseBackup(text);
+    expect(back?.lanterns.map((l) => l.kind)).toEqual(['water', 'sky']);
+  });
+
+  it('a backup written before M7 restores as sky lanterns', () => {
+    const { kind: _drop, ...old } = lantern({ id: 'old' });
+    const text = JSON.stringify({ app: 'lantern-night', version: 1, exportedAt: now.toISOString(), lanterns: [old], settings: DEFAULT_SETTINGS });
+    const back = parseBackup(text);
+    expect(back?.lanterns).toHaveLength(1);
+    expect(back?.lanterns[0]?.kind).toBe('sky');
+  });
+
+  it('gentle motion is the default and the stored value is kept for old data', () => {
+    expect(DEFAULT_SETTINGS.motion).toBe('gentle');
+    expect(DEFAULT_SETTINGS.scene).toBe('sky');
+    expect(DEFAULT_SETTINGS.shareHintShown).toBe(false);
+  });
+});
 
 describe('Store', () => {
   it('adds a wish lantern with a return 30 days out and writes it through', async () => {
     const kv = memoryKv();
     const s = new Store(kv);
     await s.load();
-    const l = await s.add({ text: 'More of this, please: sleep', sky: { x: 0.5, y: 0.3 }, seed: 3, now });
+    const l = await s.add({ text: 'More of this, please: sleep', sky: { x: 0.5, y: 0.3 }, seed: 3, kind: 'sky', now });
     expect(l.status).toBe('rising');
     expect(Date.parse(l.returnAt) - Date.parse(l.createdAt)).toBe(30 * DAY);
     const stored = await kv.get<Lantern[]>(LANTERNS_KEY);
@@ -76,7 +115,7 @@ describe('Store', () => {
     const kv = memoryKv();
     const s = new Store(kv);
     await s.load();
-    await s.add({ text: 'x', sky: { x: 0.1, y: 0.1 }, seed: 1, now });
+    await s.add({ text: 'x', sky: { x: 0.1, y: 0.1 }, seed: 1, kind: 'sky', now });
     await s.clear();
     expect(s.lanterns).toEqual([]);
     expect(await kv.get(LANTERNS_KEY)).toBeUndefined();
@@ -93,7 +132,7 @@ describe('Store', () => {
     };
     const s = new Store(broken);
     await s.load();
-    await expect(s.add({ text: 'x', sky: { x: 0.1, y: 0.1 }, seed: 1, now })).rejects.toThrow('quota');
+    await expect(s.add({ text: 'x', sky: { x: 0.1, y: 0.1 }, seed: 1, kind: 'sky', now })).rejects.toThrow('quota');
     // The in-memory list still holds it, so the lantern can rise tonight.
     expect(s.lanterns).toHaveLength(1);
     expect(s.available).toBe(false);

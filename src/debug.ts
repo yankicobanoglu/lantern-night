@@ -6,8 +6,7 @@ import type { FrameStats } from './engine/ticker';
 import type { Session } from './ritual/session';
 import { moonAge, moonFrame, type MoonFrame } from './ritual/moonPhase';
 import { isSupermoon } from './ritual/nightEvents';
-import type { SceneKind } from './scene/field';
-import type { SceneHost } from './scene/host';
+import type { LanternKind } from './scene/field';
 import type { Scene } from './scene/scene';
 import type { Store } from './store/store';
 import type { Lantern, Settings } from './store/types';
@@ -34,7 +33,7 @@ export type DebugOptions = {
   /** ?evening=0..1 pins the session light arc. */
   evening: number | null;
   /** ?scene=sky|water pins the scene at boot (ROADMAP 4.1); null follows the setting. */
-  scene: SceneKind | null;
+  scene: LanternKind | null;
   /** ?supermoon forces the larger moon (ROADMAP 4.6). */
   supermoon: boolean;
 };
@@ -87,7 +86,7 @@ export type LanternDebug = {
   /** Read a rectangle of the composed world as hex numbers, row-major (-1 for transparent). */
   sampleRect: (x: number, y: number, w: number, h: number) => number[];
   /** Active lanterns: phase, fill, art-px centre and rise progress. */
-  lanterns: () => { phase: string; fill: number; x: number; y: number; p: number }[];
+  lanterns: () => { phase: string; fill: number; x: number; y: number; p: number; kind: LanternKind }[];
   skyLights: () => number;
   /** Hold state machine. */
   hold: () => { state: string; fill: number };
@@ -126,8 +125,10 @@ export type LanternDebug = {
   evening: () => number;
   /** Real-night events (ROADMAP 4.6): the shower tonight, its star-rate factor, and whether the moon is drawn large. */
   night: () => { shower: string | null; rate: number; supermoon: boolean; moonSize: number };
-  /** The scene in use and the seconds until the next shooting star is due. */
-  sceneKind: () => SceneKind;
+  /** The kind the next lantern will be, and the seconds until the next shooting star is due. */
+  sceneKind: () => LanternKind;
+  /** How many settled lights there are of each kind (M7). */
+  lights: () => { sky: number; water: number };
   starIn: () => { due: number; interval: number };
   /** The live scene, for manual inspection in dev. */
   readonly scene: Scene;
@@ -142,7 +143,7 @@ declare global {
 
 export function installDebug(
   app: Application,
-  host: SceneHost,
+  live: Scene,
   session: Session,
   store: Store,
   audio: AudioEngine,
@@ -156,7 +157,7 @@ export function installDebug(
     if ((p[i + 3] ?? 0) === 0) return -1;
     return ((p[i] ?? 0) << 16) | ((p[i + 1] ?? 0) << 8) | (p[i + 2] ?? 0);
   };
-  const scene = (): Scene => host.scene;
+  const scene = (): Scene => live;
   window.__lantern = {
     get layout() {
       return getLayout();
@@ -184,8 +185,8 @@ export function installDebug(
       for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) result.push(readPixel(out.pixels, out.width, xx, yy));
       return result;
     },
-    lanterns: () => scene().lanterns.lanterns.map((l) => ({ phase: l.phase, fill: l.fill, x: l.x, y: l.y, p: l.rise.p })),
-    skyLights: () => scene().skyLights.lights.length,
+    lanterns: () => scene().activeLanterns.map((l) => ({ phase: l.phase, fill: l.fill, x: l.x, y: l.y, p: l.rise.p, kind: l.kind })),
+    skyLights: () => scene().allLights.length,
     hold: () => ({ state: session.hold.state, fill: session.hold.fill }),
     light: () => session.hold.lightNow(),
     release: () => session.hold.releaseNow(),
@@ -211,7 +212,7 @@ export function installDebug(
       fireflies: scene().fireflies.report(),
       cozy: scene().cozy.report(),
       moonHalo: scene().moon.halo.visible,
-      lanternBloom: scene().lanterns.lanterns.map((l) => l.bloom),
+      lanternBloom: scene().activeLanterns.map((l) => l.bloom),
     }),
     setQuality: (level) => {
       governor.set(level);
@@ -219,7 +220,8 @@ export function installDebug(
     },
     evening: () => scene().evening,
     night: () => ({ ...session.night(), moonSize: scene().moon.size }),
-    sceneKind: () => host.kind,
+    sceneKind: () => session.lanternKind(),
+    lights: () => ({ sky: scene().skyLights.lights.length, water: scene().waterLights.lights.length }),
     starIn: () => session.starIn(),
     get scene() {
       return scene();

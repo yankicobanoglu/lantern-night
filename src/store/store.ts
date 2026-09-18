@@ -1,5 +1,6 @@
+import type { LanternKind } from '../scene/field';
 import type { Kv } from './kv';
-import { DEFAULT_SETTINGS, isLantern, returnDate, type Lantern, type LanternStatus, type Settings } from './types';
+import { DEFAULT_SETTINGS, readLanterns, returnDate, type Lantern, type LanternStatus, type Settings } from './types';
 
 export const LANTERNS_KEY = 'lanterns';
 export const SETTINGS_KEY = 'settings';
@@ -20,7 +21,7 @@ export class Store {
 
   async load(): Promise<void> {
     const raw = await this.kv.get<unknown>(LANTERNS_KEY);
-    this.lanterns = Array.isArray(raw) ? raw.filter(isLantern) : [];
+    this.lanterns = readLanterns(raw);
     const s = await this.kv.get<Partial<Settings>>(SETTINGS_KEY);
     this.settings = { ...DEFAULT_SETTINGS, ...(s && typeof s === 'object' ? s : {}) };
   }
@@ -35,7 +36,7 @@ export class Store {
   }
 
   /** Create and store a wish lantern. */
-  async add(input: { text: string; sky: { x: number; y: number }; seed: number; now: Date }): Promise<Lantern> {
+  async add(input: { text: string; sky: { x: number; y: number }; seed: number; kind: LanternKind; now: Date }): Promise<Lantern> {
     const l: Lantern = {
       id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
       text: input.text,
@@ -44,6 +45,7 @@ export class Store {
       status: 'rising',
       sky: input.sky,
       seed: input.seed,
+      kind: input.kind,
     };
     this.lanterns.push(l);
     await this.saveLanterns();
@@ -100,7 +102,7 @@ export class Store {
 
   /** Test hook: replace the stored lanterns. */
   async replaceAll(lanterns: Lantern[]): Promise<void> {
-    this.lanterns = lanterns.filter(isLantern);
+    this.lanterns = readLanterns(lanterns);
     await this.saveLanterns();
   }
 }

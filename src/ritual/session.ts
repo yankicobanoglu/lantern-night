@@ -2,10 +2,9 @@ import type { Renderer } from 'pixi.js';
 import { LIGHT_ARC_S, siteUrl, STAR_FIRST_SESSION_MAX_S, STAR_INTERVAL_MAX_S, STAR_INTERVAL_MIN_S } from '../config';
 import type { AudioEngine } from '../audio/engine';
 import type { Layout } from '../engine/layout';
-import { systemMotionLevel, type MotionLevel } from '../engine/motion';
+import type { MotionLevel } from '../engine/motion';
 import { createRng } from '../engine/rng';
-import { fieldToArt, type SceneKind } from '../scene/field';
-import type { SceneHost } from '../scene/host';
+import { fieldToArt, lanternKindOf, type LanternKind } from '../scene/field';
 import type { Lantern as SceneLantern } from '../scene/lantern';
 import type { Scene } from '../scene/scene';
 import { pickStarPath, type StarAvoid } from '../scene/shootingStar';
@@ -25,6 +24,7 @@ import { MoonLabel } from '../ui/moonLabel';
 import { MuteButton } from '../ui/mute';
 import { ReturnScreen, type ReturnAnswer } from '../ui/returnCard';
 import { SettingsSheet } from '../ui/settings';
+import { ShareButton } from '../ui/shareButton';
 import { ShareSheet } from '../ui/shareSheet';
 import { SkyView, type SkyEntry } from '../ui/skyView';
 import { StarUi } from '../ui/starUi';
@@ -38,8 +38,8 @@ import { meteorShower, starRate } from './nightEvents';
 export type SessionDeps = {
   root: HTMLElement;
   canvas: HTMLCanvasElement;
-  /** Owns the live scene; the Scene setting swaps it (ROADMAP 4.1). */
-  host: SceneHost;
+  /** The world. Both kinds of lantern live in it at once (M7). */
+  scene: Scene;
   store: Store;
   audio: AudioEngine;
   renderer: Renderer;
@@ -56,8 +56,8 @@ export type SessionDeps = {
   /** The captured beforeinstallprompt event, if the browser offered one. */
   installPrompt: () => BeforeInstallPromptEvent | null;
   seed: number;
-  /** ?scene=sky|water pins the scene (tests); null follows the setting. */
-  sceneOverride: SceneKind | null;
+  /** ?scene=sky|water pins the kind the wish screen starts on (tests); null follows the last choice. */
+  sceneOverride: LanternKind | null;
 };
 
 /**
@@ -83,6 +83,7 @@ export class Session {
   private readonly share: ShareSheet;
   readonly menu: Menu;
   private readonly mute: MuteButton;
+  private readonly shareButton: ShareButton;
   private readonly moon: MoonLabel;
   private readonly toast: Toast;
   private readonly starUi: StarUi;
@@ -102,10 +103,13 @@ export class Session {
   /** The last interval the session scheduled (test hook). */
   private lastStarInterval = NaN;
 
-  /** The live scene (it changes when the Scene setting does). */
+  /** The world. One scene for the whole session; both kinds live in it. */
   private get scene(): Scene {
-    return this.deps.host.scene;
+    return this.deps.scene;
   }
+
+  /** The kind the next lantern will be (M7): chosen on the wish screen, remembered for the next one. */
+  private kind: LanternKind = 'sky';
 
   constructor(private readonly deps: SessionDeps) {
     const { root, audio } = deps;
@@ -115,13 +119,13 @@ export class Session {
 
     this.hold = new HoldController(deps.canvas, {
       onFill: (fill, holding) => {
-        const l = this.scene.lanterns.resting;
+        const l = this.scene.resting;
         if (l) l.fill = fill;
         this.lightUi.holding(holding);
         audio.setFlame(fill);
       },
       onLit: () => {
-        const l = this.scene.lanterns.resting;
+        const l = this.scene.resting;
         if (l) {
           l.fill = 1;
           l.phase = 'lit';
@@ -137,7 +141,6 @@ export class Session {
       onRelease: () => this.hold.releaseNow(),
       onAnother: () => this.lightAnother(),
       onGoodnight: () => this.goodnight(),
-      onShare: () => this.openShare(this.lastWish),
     });
     this.arrive = new ArriveScreen(root, () => this.begin());
     this.returnCard = new ReturnScreen(
@@ -145,7 +148,7 @@ export class Session {
       (l, answer) => void this.answerReturn(l, answer),
       () => this.showIntention(),
     );
-    this.intention = new IntentionScreen(root, (mode, text) => this.fold(mode, text));
+    this.intention = new IntentionScreen(root, (mode, text, kind) => this.fold(mode, text, kind));
     this.veil = el('div', { class: 'veil', role: 'button', tabindex: -1, 'aria-label': 'Back to the start' });
     this.goodnightLine = el('p', { class: 'goodnight-line', role: 'status', 'aria-live': 'polite' });
     const leaveGoodnight = (): void => {
@@ -170,13 +173,13 @@ export class Session {
       () => this.closeOverlays(),
       () => this.openShare(this.skyView.selectedWish),
       (id) => {
-        const rising = this.scene.lanterns.rising.find((r) => this.risingId(r) === id);
+        const rising = this.scene.rising.find((r) => this.risingId(r) === id);
         if (!rising) return null;
         const L = deps.layout();
         return { x: rising.x * L.cssScale, y: rising.y * L.cssScale };
       },
-      (p, L) => {
-        const a = fieldToArt(p, this.scene.field);
+      (p, kind, L) => {
+        const a = fieldToArt(p, this.scene.fieldOf(kind));
         return { x: a.x * L.cssScale, y: a.y * L.cssScale };
       },
     );
@@ -203,11 +206,15 @@ export class Session {
       onSettings: () => {
         this.skyView.hide();
         this.share.hide();
-        this.settings.show(this.deps.store.settings, this.motion());
+        this.settings.show(this.deps.store.settings);
         root.classList.add('overlay-open');
       },
     });
     this.mute = new MuteButton(root, (on) => void this.changeSettings({ sound: on }));
+    this.shareButton = new ShareButton(root, () => {
+      this.shareButton.hideHint();
+      this.openShare(this.lastWish);
+    });
     this.moon = new MoonLabel(root, deps.now);
     this.toast = new Toast(root);
     this.starUi = new StarUi(root, (x, y) => this.tapStar(x, y));
@@ -236,63 +243,24 @@ export class Session {
 
   // ---------- Settings-derived ----------
 
+  /**
+   * Motion level. Since M7 the app always runs gentle (SPEC section 7, Motion):
+   * there is no setting, and `?motion=` only exists for tests. Reduced-motion
+   * visitors are served by construction, since gentle is that treatment.
+   */
   motion(): MotionLevel {
-    if (this.deps.motionOverride) return this.deps.motionOverride;
-    const m = this.deps.store.settings.motion;
-    return m === 'system' ? systemMotionLevel() : m;
-  }
-
-  /** The scene to show: the test pin, else the setting. */
-  private sceneKind(): SceneKind {
-    return this.deps.sceneOverride ?? this.deps.store.settings.scene;
+    return this.deps.motionOverride ?? 'gentle';
   }
 
   private applySettings(): void {
     const s = this.deps.store.settings;
     document.documentElement.style.setProperty('--text-scale', String(s.textScale));
-    const kind = this.sceneKind();
-    if (kind !== this.deps.host.kind) this.switchScene(kind);
-    this.lightUi.setSceneKind(kind);
-    this.settings.setScene(kind);
     const m = this.motion();
     this.scene.setMotion(m);
     this.lightUi.setMotion(m);
     this.deps.audio.setEnabled(s.sound);
     this.mute.set(s.sound);
     this.settings.setSound(s.sound);
-  }
-
-  /**
-   * The Scene setting changed (ROADMAP 4.1): swap the world, keep the night.
-   * Every light carries over. A lantern still waiting is placed again in the
-   * new scene with its words (hold again); lanterns on their way settle at
-   * once, and the watch buttons show if they had not yet.
-   */
-  private switchScene(kind: SceneKind): void {
-    const old = this.scene;
-    const waiting = old.lanterns.resting;
-    const words = waiting?.wishText ?? null;
-    for (const l of old.lanterns.rising) old.lanterns.settleNow(l);
-    const lights = old.skyLights.lights.map((l) => ({ ...l }));
-    const scene = this.deps.host.swap(kind, this.deps.layout(), this.motion(), lights);
-    this.released = null;
-    this.starUi.follow(null);
-    const state = this.machine.state;
-    if (state === 'light' && waiting) {
-      const l = scene.lanterns.spawnResting();
-      l.wishText = words;
-      this.lightUi.setWish(words);
-      this.hold.arm();
-      this.lightUi.idle();
-    } else if (state === 'release' || state === 'watch') {
-      if (!this.watchShown) {
-        this.watchShown = true;
-        this.lightUi.watch();
-      }
-      this.lightUi.settled();
-    }
-    this.followLantern();
-    if (this.skyView.isOpen) this.skyView.show(this.skyEntries(), this.deps.layout());
   }
 
   private async changeSettings(patch: Partial<Settings>): Promise<void> {
@@ -306,7 +274,8 @@ export class Session {
     const { store } = this.deps;
     await store.load();
     this.applySettings();
-    for (const l of store.lanterns) this.scene.skyLights.add({ id: l.id, seed: l.seed, sky: l.sky, status: l.status });
+    this.kind = this.deps.sceneOverride ?? lanternKindOf(store.settings.scene);
+    for (const l of store.lanterns) this.scene.addLight({ id: l.id, seed: l.seed, sky: l.sky, status: l.status, kind: l.kind });
     this.machine.go('arrive');
     this.showArrive();
     if (!store.available) this.toast.show(COPY.system.storageUnavailable, 8000);
@@ -320,6 +289,11 @@ export class Session {
   private starInterval(): number {
     this.lastStarInterval = this.rng.range(STAR_INTERVAL_MIN_S, STAR_INTERVAL_MAX_S) / this.starRate;
     return this.lastStarInterval;
+  }
+
+  /** Test hook: the kind the next lantern will be (M7). */
+  lanternKind(): LanternKind {
+    return this.kind;
   }
 
   /** Test hook: tonight's events. */
@@ -368,14 +342,14 @@ export class Session {
     const { store } = this.deps;
     const scene = this.scene;
     const byId = new Map(store.lanterns.map((l) => [l.id, l]));
-    const out: SkyEntry[] = scene.skyLights.lights.map((l) => {
+    const out: SkyEntry[] = scene.allLights.map((l) => {
       const rec = l.id ? byId.get(l.id) : undefined;
-      return { id: l.id ?? `night-${l.seed}`, sky: l.sky, text: rec?.text ?? null, createdAt: rec?.createdAt ?? null, status: l.status };
+      return { id: l.id ?? `night-${l.seed}`, sky: l.sky, kind: l.kind, text: rec?.text ?? null, createdAt: rec?.createdAt ?? null, status: l.status };
     });
-    for (const r of scene.lanterns.rising) {
+    for (const r of scene.rising) {
       if (!r.sky) continue;
       const rec = r.storedId ? byId.get(r.storedId) : undefined;
-      out.push({ id: this.risingId(r), sky: r.sky, text: rec?.text ?? r.wishText, createdAt: rec?.createdAt ?? null, status: 'rising' });
+      out.push({ id: this.risingId(r), sky: r.sky, kind: r.kind, text: rec?.text ?? r.wishText, createdAt: rec?.createdAt ?? null, status: 'rising' });
     }
     return out;
   }
@@ -399,21 +373,25 @@ export class Session {
     this.returnCard.hide();
     this.lightUi.hide();
     this.mode = defaultMode(this.moonNow());
-    this.intention.show(this.mode);
+    this.intention.show(this.mode, this.kind);
   }
 
   private async answerReturn(l: Lantern, answer: ReturnAnswer): Promise<void> {
     const updated = await this.deps.store.answerReturn(l.id, answer, this.deps.now()).catch(() => undefined);
-    if (updated) this.scene.skyLights.setStatus(updated.id, updated.status);
+    if (updated) this.scene.setLightStatus(updated.id, updated.status);
   }
 
   // ---------- Light → release → watch ----------
 
-  private fold(mode: Mode, text: string): void {
+  private fold(mode: Mode, text: string, kind: LanternKind): void {
     if (!this.machine.go('light')) return;
     this.mode = mode;
+    this.kind = kind;
     this.intention.hide();
-    const l = this.scene.lanterns.spawnResting();
+    // The choice is remembered as the default for the next lantern.
+    if (this.deps.store.settings.scene !== kind) void this.deps.store.saveSettings({ scene: kind }).catch(() => undefined);
+    this.lightUi.setKind(kind);
+    const l = this.scene.lanternsOf(kind).spawnResting();
     l.wishText = text;
     this.lightUi.setWish(text);
     this.followLantern();
@@ -424,8 +402,8 @@ export class Session {
   private async release(): Promise<void> {
     const { store, audio } = this.deps;
     const scene = this.scene;
-    const l = scene.lanterns.resting;
-    if (!l || !scene.lanterns.release(l) || !l.sky) return;
+    const l = scene.resting;
+    if (!l || !scene.release(l) || !l.sky) return;
     this.machine.go('release');
     this.released = l;
     this.watchShown = false;
@@ -436,7 +414,7 @@ export class Session {
     this.lastWish = this.mode === 'wish' ? l.wishText : null;
     if (this.mode === 'wish') {
       try {
-        const record = await store.add({ text: l.wishText ?? '', sky: l.sky, seed: l.seed, now: this.deps.now() });
+        const record = await store.add({ text: l.wishText ?? '', sky: l.sky, seed: l.seed, kind: l.kind, now: this.deps.now() });
         l.storedId = record.id;
         void this.requestPersistence();
       } catch {
@@ -465,6 +443,7 @@ export class Session {
   private lightAnother(): void {
     if (this.machine.state !== 'watch') return;
     this.released = null;
+    this.shareButton.hideHint();
     this.installHint.hide();
     this.showIntention();
   }
@@ -472,6 +451,7 @@ export class Session {
   private goodnight(): void {
     if (!this.machine.go('goodnight')) return;
     this.lightUi.hide();
+    this.shareButton.hideHint();
     this.installHint.hide();
     this.released = null;
     this.goodnightLine.textContent = this.mode === 'wish' ? COPY.goodnight.wish : COPY.goodnight.letGo;
@@ -486,6 +466,18 @@ export class Session {
     this.veil.classList.remove('on');
     this.goodnightLine.classList.remove('on');
     this.showArrive();
+  }
+
+  /**
+   * One line under the corner share button, once ever, as the first lantern
+   * settles into the sky: the button is new and quiet, so it is pointed at
+   * once and never again (M7).
+   */
+  private maybeShowShareHint(): void {
+    const { store } = this.deps;
+    if (store.settings.shareHintShown) return;
+    void store.saveSettings({ shareHintShown: true }).catch(() => undefined);
+    this.shareButton.showHint();
   }
 
   // ---------- Install hint ----------
@@ -545,7 +537,7 @@ export class Session {
       this.skyView.show(this.skyEntries(), this.deps.layout());
     } else {
       this.deps.root.classList.remove('overlay-open');
-      focusNode(this.deps.root.querySelector<HTMLElement>('.stage .btn[data-action="share"]') ?? this.menu.button);
+      focusNode(this.shareButton.node);
     }
   }
 
@@ -557,11 +549,10 @@ export class Session {
       renderer,
       seed: scene.seed,
       moonFrame: scene.moon.currentFrame,
-      skyLights: scene.skyLights.lights,
-      rising: scene.lanterns.rising.map((l) => l.rise.p),
+      skyLights: scene.allLights,
+      rising: scene.rising.map((l) => ({ p: l.rise.p, kind: l.kind })),
       wish,
       evening: scene.evening,
-      kind: scene.kind,
       supermoon: scene.moon.isSupermoon,
     });
   }
@@ -570,7 +561,7 @@ export class Session {
     const { layout } = this.deps;
     const scene = this.scene;
     const L = layout();
-    const l = scene.lanterns.resting ?? (this.released && this.released.phase === 'rising' ? this.released : null);
+    const l = scene.resting ?? (this.released && this.released.phase === 'rising' ? this.released : null);
     if (l) this.lightUi.follow(l.x * L.cssScale, l.y * L.cssScale, window.innerWidth);
   }
 
@@ -596,7 +587,7 @@ export class Session {
     const before = new Set(this.deps.store.lanterns.map((l) => l.id));
     const added = await this.deps.store.merge(backup.lanterns).catch(() => 0);
     for (const l of this.deps.store.lanterns) {
-      if (!before.has(l.id)) this.scene.skyLights.add({ id: l.id, seed: l.seed, sky: l.sky, status: l.status });
+      if (!before.has(l.id)) this.scene.addLight({ id: l.id, seed: l.seed, sky: l.sky, status: l.status, kind: l.kind });
     }
     this.toast.show(`${COPY.settings.restored} ${COPY.settings.restoredCount(added)}`, 7000);
     if (this.skyView.isOpen) this.skyView.show(this.skyEntries(), this.deps.layout());
@@ -604,7 +595,7 @@ export class Session {
 
   private async clearSky(): Promise<void> {
     await this.deps.store.clear().catch(() => undefined);
-    this.scene.skyLights.clear();
+    this.scene.clearLights();
     if (this.skyView.isOpen) this.skyView.show(this.skyEntries(), this.deps.layout());
   }
 
@@ -615,7 +606,7 @@ export class Session {
     const scene = this.scene;
     const L = layout();
     const css = L.cssScale;
-    const avoid: StarAvoid[] = scene.lanterns.lanterns.filter((l) => l.phase !== 'done').map((l) => ({ x: l.x * css, y: l.y * css, r: 60 }));
+    const avoid: StarAvoid[] = scene.activeLanterns.filter((l) => l.phase !== 'done').map((l) => ({ x: l.x * css, y: l.y * css, r: 60 }));
     const path = pickStarPath(L, this.rng.int(1, 1 << 30), avoid);
     if (!path) {
       this.nextStarIn = 5;
@@ -670,10 +661,11 @@ export class Session {
     if (starActive && !this.starWasActive) this.starHint();
     this.starWasActive = starActive;
     this.starUi.follow(scene.star.head());
-    if (this.skyView.isOpen && scene.lanterns.rising.length > 0) this.skyView.place(this.deps.layout());
-    if (state === 'watch' && this.released && !this.watchShown && scene.lanterns.wellOnItsWay(this.released)) {
+    if (this.skyView.isOpen && scene.rising.length > 0) this.skyView.place(this.deps.layout());
+    if (state === 'watch' && this.released && !this.watchShown && scene.wellOnItsWay(this.released)) {
       this.watchShown = true;
       this.lightUi.watch();
+      this.maybeShowShareHint();
       this.maybeShowInstallHint();
     }
     if (state === 'watch' && this.released && this.released.phase === 'done') {

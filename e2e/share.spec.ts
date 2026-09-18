@@ -117,9 +117,11 @@ test.describe('share image', () => {
     await page.getByRole('button', { name: 'Let it rise' }).click();
     await page.waitForSelector('#ui[data-state="watch"]');
     await page.evaluate(() => window.__lantern!.speed(8));
-    await expect(page.locator('.stage').getByRole('button', { name: 'Share my sky' })).toBeVisible({ timeout: 15_000 });
+    // M7: sharing is the corner button beside the mute toggle, not a watch-row pill.
+    await expect(page.getByRole('button', { name: 'Light another' })).toBeVisible({ timeout: 15_000 });
     await page.evaluate(() => window.__lantern!.speed(1));
-    await page.locator('.stage').getByRole('button', { name: 'Share my sky' }).click();
+    await expect(page.locator('.stage').getByRole('button', { name: 'Share my sky' })).toHaveCount(0);
+    await page.locator('.corner.share-sky').click();
     await expect(page.locator('.share')).toBeVisible();
     await expect(page.getByRole('switch', { name: 'Include my wish' })).toBeVisible();
     await expect(page.locator('.share-preview')).toHaveAttribute('src', /^data:image\/png/, { timeout: 15_000 });

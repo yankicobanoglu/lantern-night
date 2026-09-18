@@ -1,14 +1,18 @@
 import { clampText, COPY, intentionCopy, MAX_TEXT, type Mode } from '../ritual/copy';
+import { LANTERN_KINDS, type LanternKind } from '../scene/field';
 import { button, el } from './dom';
 import { focusNode } from './focus';
 
 /**
  * Intention screen (SPEC section 3, step 3): mode toggle, heading, one field
- * capped at 120 characters, prompt chips, Fold my lantern.
+ * capped at 120 characters, prompt chips, the kind of lantern to fold (M7),
+ * and Fold my lantern.
  */
 export class IntentionScreen {
   readonly node: HTMLElement;
   mode: Mode = 'wish';
+  /** Which lantern this one will be (M7): it rises into the sky, or drifts out on the lake. */
+  kind: LanternKind = 'sky';
   private readonly heading: HTMLElement;
   private readonly field: HTMLTextAreaElement;
   private readonly helper: HTMLElement;
@@ -16,10 +20,11 @@ export class IntentionScreen {
   private readonly chips: HTMLElement;
   private readonly wishBtn: HTMLButtonElement;
   private readonly letGoBtn: HTMLButtonElement;
+  private readonly kindBtns: HTMLButtonElement[];
   private readonly foldBtn: HTMLButtonElement;
   private lastChip: string | null = null;
 
-  constructor(root: HTMLElement, onFold: (mode: Mode, text: string) => void) {
+  constructor(root: HTMLElement, onFold: (mode: Mode, text: string, kind: LanternKind) => void) {
     this.heading = el('h2', { class: 'heading' });
     this.field = el('textarea', {
       class: 'field',
@@ -35,10 +40,13 @@ export class IntentionScreen {
     this.chips = el('div', { class: 'chips', role: 'group', 'aria-label': 'Prompts' });
     this.wishBtn = button(COPY.intention.modeWish, 'ghost small', () => this.setMode('wish'), { 'aria-pressed': 'true' });
     this.letGoBtn = button(COPY.intention.modeLetGo, 'ghost small', () => this.setMode('let-go'), { 'aria-pressed': 'false' });
+    this.kindBtns = LANTERN_KINDS.map((kind) =>
+      button(COPY.intention.kinds[kind], 'ghost small', () => this.setKind(kind), { 'aria-pressed': 'false', 'data-kind': kind }),
+    );
     this.foldBtn = button(COPY.intention.fold, 'primary', () => {
       const text = clampText(this.field.value);
       if (!text) return;
-      onFold(this.mode, text);
+      onFold(this.mode, text, this.kind);
     });
     this.field.addEventListener('input', () => this.onInput());
     this.field.addEventListener('keydown', (e) => {
@@ -55,15 +63,23 @@ export class IntentionScreen {
         this.counter,
         this.helper,
         this.chips,
+        el('div', { class: 'row kinds', role: 'group', 'aria-label': COPY.intention.kindLabel }, this.kindBtns),
         el('div', { class: 'row' }, [this.foldBtn]),
       ]),
     ]);
     root.append(this.node);
     this.setMode('wish');
+    this.setKind('sky');
   }
 
   get text(): string {
     return clampText(this.field.value);
+  }
+
+  /** The kind of lantern to fold. Kept across modes: it is about the lantern, not the wording. */
+  setKind(kind: LanternKind): void {
+    this.kind = kind;
+    this.kindBtns.forEach((b, i) => b.setAttribute('aria-pressed', String(LANTERN_KINDS[i] === kind)));
   }
 
   setMode(mode: Mode): void {
@@ -108,8 +124,9 @@ export class IntentionScreen {
     this.foldBtn.disabled = this.field.value.trim().length === 0;
   }
 
-  show(mode: Mode): void {
+  show(mode: Mode, kind: LanternKind = this.kind): void {
     this.setMode(mode);
+    this.setKind(kind);
     this.field.value = '';
     this.lastChip = null;
     this.onInput();

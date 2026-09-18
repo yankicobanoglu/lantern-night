@@ -56,7 +56,7 @@ Measured on an M4 Mac every level holds 60 fps, so these are for the phone, in t
 
 ## 4. New features
 
-**4.1 Extra scenes (L; section 14). Partly built (M6):** the seam (a scene kind, a field for where lights settle, a scene host that swaps the world live), the Scene setting, and the first extra scene, water lanterns on the lake. Remaining: a dandelion in a field and a wishing well, each a new world for the same ritual (M each). See PLAN-M6 for why the seam is session↔scene rather than 1.3's scene↔subsystem.
+**4.1 Extra scenes (L; section 14). Partly built (M6, reshaped in M7):** water lanterns on the lake, now a per-lantern choice on the wish screen rather than a setting that swapped the world, with both kinds sharing one night. Remaining: a dandelion in a field and a wishing well, each a new world for the same ritual (M each).
 
 **4.2 Localisation (M).** The copy deck as data (1.7) plus a language setting; Turkish first, given the audience. Dates and the moon label already use the browser locale.
 
@@ -75,6 +75,14 @@ Measured on an M4 Mac every level holds 60 fps, so these are for the phone, in t
 **4.9 Night Train tie-in (L; section 14).** Lanterns drifting past the train window in the other project, read from the same backup format.
 
 **4.10 A custom domain (S; section 14).** `base: '/'`, the manifest and the workflow follow from the single config value.
+
+## 5. Life in the landscape (proposed in PLAN-M7, not built)
+
+The soundscape lost its crickets, so the world should show its life instead. All drawn in code, in the existing palette and pixel grid, rare enough to feel like a gift and never crossing the UI or the active lantern. Sizes are per item: **5.1 a heron on the shore (M)**, **5.2 ducks crossing the lake (S)**, **5.3 a cat on the dock (S)**, **5.4 moths at a waiting lantern (S)**, **5.5 an owl across the moon (S)**, **5.6 a fish rising, rings only (S)**, **5.7 a distant train on the far hills (M)**, **5.8 grazing silhouettes on the hills (S)**, **5.9 weather as a rare gift, mist or December snow (M)**, **5.10 bats early in a session (S)**. Suggested first: the heron, the ducks and the fish rings, which together are one milestone and touch nothing in the ritual. PLAN-M7 section 5 has the detail.
+
+## 6. Cozier and more manifestation-minded (proposed in PLAN-M7, not built)
+
+Held to SPEC section 1: nothing leaves the device, no accounts, no streaks, no guilt. **6.1 a word for the season (M)**, **6.2 the exhale as a real breath after lighting (S)**, **6.3 a lantern carried for someone else (M)**, **6.4 gratitude as a third mode (S)**, **6.5 a line of reflection when a lantern returns (S)**, **6.6 anniversaries, gently (S)**, **6.7 the wishes exported as plain text (S)**, **6.8 a friend's sky read from their backup file, for one session (M)**, **6.9 a name for the night in the moon label (S)**, **6.10 a "stay a while" mode with no UI (S)**, **6.11 a gentler first night (S)**. Suggested first: the word for the season, gratitude, and Your sky by month (4.3). PLAN-M7 section 6 has the detail.
 
 ## Not planned
 
