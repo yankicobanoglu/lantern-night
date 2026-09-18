@@ -34,8 +34,10 @@ describe('computeLayout', () => {
       expect(l.moon.y + 16).toBeLessThan(l.horizon * 0.6);
       expect(Math.abs(l.centreX - l.width / 2)).toBeLessThanOrEqual(1);
       expect(l.lanternRest.x).toBe(l.centreX);
-      expect(l.lanternRest.y).toBeLessThan(l.lakeEnd);
-      expect(l.lanternRest.y + 12).toBeGreaterThan(l.lakeEnd);
+      // Held just above the shoreline: the 34-row sprite's bottom stays over the water, its top below the hills.
+      expect(l.lanternRest.y + 17).toBeLessThan(l.lakeEnd);
+      expect(l.lanternRest.y + 17).toBeGreaterThan(l.lakeEnd - 14);
+      expect(l.lanternRest.y - 17).toBeGreaterThan(l.hillsEnd);
     }
   });
 

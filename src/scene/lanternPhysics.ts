@@ -57,6 +57,7 @@ export function stepRise(s: RiseState, dt: number, wind: Wind, tSec: number, o: 
 }
 
 /** Which sprite to show at this height. */
-export function sizeStage(p: number): 'big' | 'small' | 'dot' {
-  return p < 0.4 ? 'big' : p < 0.85 ? 'small' : 'dot';
+/** Resting and low: the 26×34 sprite; then 18×24, 9×12 and the 4×4 dot as it climbs. */
+export function sizeStage(p: number): 'large' | 'big' | 'small' | 'dot' {
+  return p < 0.18 ? 'large' : p < 0.45 ? 'big' : p < 0.85 ? 'small' : 'dot';
 }

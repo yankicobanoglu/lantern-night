@@ -8,7 +8,7 @@ import { PALETTE } from '../palette';
 import { sizeStage, stepRise, type RiseOptions, type RiseState } from './lanternPhysics';
 import type { LanternTextures } from './lanternTextures';
 import type { SkyPoint } from './skyPoint';
-import { DOT, LANTERN_H, LANTERN_W, SMALL_H, SMALL_W } from './sprites/lantern';
+import { DOT, LANTERN_H, LANTERN_W, LARGE_H, LARGE_W, SMALL_H, SMALL_W } from './sprites/lantern';
 
 export type LanternPhase = 'unlit' | 'lit' | 'rising' | 'done';
 
@@ -50,7 +50,7 @@ export class Lantern {
   private readonly halo: Sprite;
   private readonly core: Sprite;
   private readonly streak: Sprite;
-  private stage: 'big' | 'small' | 'dot' = 'big';
+  private stage: 'large' | 'big' | 'small' | 'dot' = 'large';
 
   constructor(
     readonly seed: number,
@@ -138,7 +138,7 @@ export class Lantern {
     if (stage !== this.stage) {
       this.stage = stage;
       this.applyTextures();
-    } else if (stage === 'big') {
+    } else if (stage === 'big' || stage === 'large') {
       this.applyTextures();
     } else {
       const t = stage === 'small' ? this.tex.small[this.frame % 2]! : this.tex.dot[this.frame % 2]!;
@@ -151,13 +151,26 @@ export class Lantern {
   }
 
   private applyTextures(): void {
-    const t = this.stage === 'big' ? this.tex.bigFor(this.frame, this.fill) : this.stage === 'small' ? this.tex.small[this.frame % 2]! : this.tex.dot[this.frame % 2]!;
+    const t =
+      this.stage === 'large'
+        ? this.tex.largeFor(this.frame, this.fill)
+        : this.stage === 'big'
+          ? this.tex.bigFor(this.frame, this.fill)
+          : this.stage === 'small'
+            ? this.tex.small[this.frame % 2]!
+            : this.tex.dot[this.frame % 2]!;
     this.aboveSprite.texture = t;
     this.nearSprite.texture = t;
   }
 
   private spriteSize(): { w: number; h: number } {
-    return this.stage === 'big' ? { w: LANTERN_W, h: LANTERN_H } : this.stage === 'small' ? { w: SMALL_W, h: SMALL_H } : { w: DOT, h: DOT };
+    return this.stage === 'large'
+      ? { w: LARGE_W, h: LARGE_H }
+      : this.stage === 'big'
+        ? { w: LANTERN_W, h: LANTERN_H }
+        : this.stage === 'small'
+          ? { w: SMALL_W, h: SMALL_H }
+          : { w: DOT, h: DOT };
   }
 
   private place(tSec: number): void {
@@ -179,7 +192,7 @@ export class Lantern {
 
     // Halo: about 4 lantern widths on the shore, shrinking to a sky-light halo of ~14 art px.
     const bloom = this.quality >= 2;
-    const haloD = (LANTERN_W * 4 * (1 - p) + 14 * p) * css;
+    const haloD = (LARGE_W * 3.4 * (1 - p) + 14 * p) * css;
     this.halo.position.set(cx, cy);
     this.halo.width = haloD;
     this.halo.height = haloD;
@@ -188,7 +201,7 @@ export class Lantern {
     this.streak.visible = bloom;
 
     const coreD = (w * 1.6 + 2) * css;
-    this.core.position.set(cx, cy + (this.stage === 'big' ? 4 * css : 0));
+    this.core.position.set(cx, cy + (this.stage === 'large' ? 6 * css : this.stage === 'big' ? 4 * css : 0));
     this.core.width = coreD;
     this.core.height = coreD;
     this.core.alpha = 0.5 * lit * flicker;
@@ -201,8 +214,8 @@ export class Lantern {
     const overWater = Math.max(0, Math.min(1, (L.lakeEnd - bottom) / 12));
     const wobble = Math.sin(tSec * 1.3 + this.swayPhase) * 1.2 * css;
     this.streak.position.set(cx + wobble, Math.min(waterY, L.lakeEnd - 1) * css);
-    this.streak.width = LANTERN_W * 2 * css * (1 - 0.5 * p);
-    this.streak.height = LANTERN_W * 4 * css * (1 - 0.6 * p);
+    this.streak.width = LARGE_W * 1.8 * css * (1 - 0.5 * p);
+    this.streak.height = LARGE_W * 3.4 * css * (1 - 0.6 * p);
     this.streak.alpha = 0.4 * lit * overWater * Math.pow(1 - p, 1.5) * flicker;
   }
 

@@ -6,7 +6,7 @@ A calm, 2–3 minute evening ritual in the browser. You write a wish (or somethi
 
 The whole thing is a static site: soft pixel art drawn in code, light and sound generated at runtime, installable to the iPhone home screen, and it works offline. Nothing you write ever leaves your device.
 
-The full build spec is in [SPEC.md](SPEC.md); the working rules for Claude Code are in [CLAUDE.md](CLAUDE.md) and the milestone plans in `PLAN-M*.md`.
+The full build spec is in [SPEC.md](SPEC.md); the working rules for Claude Code are in [CLAUDE.md](CLAUDE.md), the milestone plans in `PLAN-M*.md`, and what could come next in [ROADMAP.md](ROADMAP.md).
 
 ## Privacy
 

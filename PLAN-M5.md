@@ -128,3 +128,12 @@ With the governor live on the heavy scene it stays at level 3 here (60 fps after
 14. **Boat** redrawn at 24×7 art px (was 15×5) with a lamp post at the bow and two seats.
 
 Tests: `e2e/reviewM5.spec.ts` (items 1, 2, 5, 6, 9, 10, 11, 12, 13), `starAndMoon.spec.ts` updated for item 3.
+
+## Second round of fixes after the live check (2026-09-18)
+
+1. **Your sky now reads the scene.** It lists every light that is glowing up there, stored or not: stored wishes with their date and words, session-only let-go lights with a card line ("Set down tonight. Its words stayed with the night.", copy proposal), and rising lanterns with their ring travelling along. The count can no longer disagree with the sky. "1 lantern lit" in the singular (copy proposal).
+2. **Crickets** rebuilt: two crickets, one each side, each a lightly detuned pair of sines with a slow vibrato, rounded pulse envelopes with small timing and level jitter, bouts of 3–6 chirps that swell and fade, long rests, a low-pass at 5.2 kHz and a short generated reverb. Peak level 0.03 (was 0.045 with hard linear ramps). To confirm by ear on the phone.
+3. **Lantern** gains a resting stage at 26×34 art px (was 18×24) with its own map, glow, fill rows and flame; it steps to 18×24 at 18 % of the rise, then 9×12, then the 4×4 dot. Held at `lakeEnd − 26` so it floats above the shoreline instead of sitting on the bottom edge. Halo and streak sized to the new width.
+4. **Boat** redrawn as a rowing boat seen from above at an angle, bow to the lower left, both oars out, lamp on the stern post (28×12 art px).
+5. **iOS keyboard.** The UI layer follows the visual viewport (height and offset) while the keyboard is up, and the intention panel keeps 72 px clear of Safari's floating address pill. Headless cannot raise a keyboard, so this one is for the phone check.
+6. **ROADMAP.md** written: architecture, optimisations, polish, features; nothing implemented.

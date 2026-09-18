@@ -24,7 +24,7 @@ import { MuteButton } from '../ui/mute';
 import { ReturnScreen, type ReturnAnswer } from '../ui/returnCard';
 import { SettingsSheet } from '../ui/settings';
 import { ShareSheet } from '../ui/shareSheet';
-import { SkyView } from '../ui/skyView';
+import { SkyView, type SkyEntry } from '../ui/skyView';
 import { StarUi } from '../ui/starUi';
 import { Toast } from '../ui/toast';
 import { COPY, defaultMode, type Mode } from './copy';
@@ -155,7 +155,7 @@ export class Session {
       () => this.closeOverlays(),
       () => this.openShare(this.skyView.selectedWish),
       (id) => {
-        const rising = scene.lanterns.rising.find((r) => r.storedId === id);
+        const rising = scene.lanterns.rising.find((r) => this.risingId(r) === id);
         if (!rising) return null;
         const L = deps.layout();
         return { x: rising.x * L.cssScale, y: rising.y * L.cssScale };
@@ -178,7 +178,7 @@ export class Session {
       onSky: () => {
         this.settings.hide();
         this.share.hide();
-        this.skyView.show(this.deps.store.lanterns, this.deps.layout());
+        this.skyView.show(this.skyEntries(), this.deps.layout());
         root.classList.add('overlay-open');
       },
       onSettings: () => {
@@ -280,6 +280,27 @@ export class Session {
     this.showIntention();
   }
 
+  /** Id of a rising lantern in Your sky: its stored record, else a session-only id. */
+  private risingId(l: SceneLantern): string {
+    return l.storedId ?? `rising-${l.seed}`;
+  }
+
+  /** Every light in tonight's sky, settled or still rising, with its words when they were kept. */
+  private skyEntries(): SkyEntry[] {
+    const { scene, store } = this.deps;
+    const byId = new Map(store.lanterns.map((l) => [l.id, l]));
+    const out: SkyEntry[] = scene.skyLights.lights.map((l, i) => {
+      const rec = l.id ? byId.get(l.id) : undefined;
+      return { id: l.id ?? `night-${i}`, sky: l.sky, text: rec?.text ?? null, createdAt: rec?.createdAt ?? null, status: l.status };
+    });
+    for (const r of scene.lanterns.rising) {
+      if (!r.sky) continue;
+      const rec = r.storedId ? byId.get(r.storedId) : undefined;
+      out.push({ id: this.risingId(r), sky: r.sky, text: rec?.text ?? r.wishText, createdAt: rec?.createdAt ?? null, status: 'rising' });
+    }
+    return out;
+  }
+
   /** A tap on the scene while writing: first put the keyboard away, then go back to the start. */
   private tapOutside(): void {
     if (this.machine.state !== 'intention') return;
@@ -343,7 +364,7 @@ export class Session {
       }
     }
     // Let-go text is never stored (SPEC section 6): drop it as soon as the lantern is on its way.
-    l.wishText = null;
+    if (this.mode !== 'wish') l.wishText = null;
   }
 
   /** SPEC section 6: ask the browser to keep the sky after the first lantern is saved; record the answer once. */
@@ -445,7 +466,7 @@ export class Session {
   private closeShare(): void {
     this.share.hide();
     if (this.shareReturnTo === 'sky') {
-      this.skyView.show(this.deps.store.lanterns, this.deps.layout());
+      this.skyView.show(this.skyEntries(), this.deps.layout());
     } else {
       this.deps.root.classList.remove('overlay-open');
       focusNode(this.deps.root.querySelector<HTMLElement>('.stage .btn[data-action="share"]') ?? this.menu.button);

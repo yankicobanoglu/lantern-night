@@ -89,6 +89,20 @@ async function boot(): Promise<void> {
   window.addEventListener('orientationchange', onResize);
   window.visualViewport?.addEventListener('resize', onResize);
 
+  // iOS keyboard (review after the live check): the UI layer follows the visual viewport, so the
+  // screens sit above the keyboard, and the intention panel keeps clear of Safari's floating address pill.
+  const vv = window.visualViewport;
+  const fitUi = (): void => {
+    if (!vv) return;
+    const keyboard = vv.height < window.innerHeight - 120;
+    uiRoot.style.height = keyboard ? `${Math.round(vv.height)}px` : '';
+    uiRoot.style.top = keyboard ? `${Math.round(vv.offsetTop)}px` : '';
+    uiRoot.style.bottom = keyboard ? 'auto' : '';
+    uiRoot.classList.toggle('keyboard', keyboard);
+  };
+  vv?.addEventListener('resize', fitUi);
+  vv?.addEventListener('scroll', fitUi);
+
   app.ticker.add(
     (ticker) => {
       // A home-screen web app on iOS can report the wrong height at launch without a resize event: check every frame.

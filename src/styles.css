@@ -945,6 +945,11 @@ textarea:focus-visible {
     transform: translateX(-50%);
   }
 }
+/* With the keyboard up, the writing panel sits above it and clear of Safari's floating address pill. */
+#ui.keyboard .screen.intention {
+  bottom: calc(72px + var(--safe-bottom));
+  max-height: calc(100% - 84px);
+}
 /* Overlays take the taps on their backdrop so a tap anywhere closes them; their text blocks let taps through to the rings. */
 .overlay.on {
   pointer-events: auto;

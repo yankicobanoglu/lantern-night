@@ -84,7 +84,10 @@ export const COPY = {
   },
   sky: {
     heading: 'Your sky',
-    count: (n: number) => `${n} lanterns lit`,
+    /** "{n} lanterns lit" in the deck; the singular is a proposal after the live check. */
+    count: (n: number) => (n === 1 ? '1 lantern lit' : `${n} lanterns lit`),
+    /** Card for a light whose words were never kept (not in the deck; proposed after the live check). */
+    letGoCard: 'Set down tonight. Its words stayed with the night.',
     empty: 'Your sky is waiting for its first light.',
     close: 'Close',
   },

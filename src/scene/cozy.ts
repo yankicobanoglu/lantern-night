@@ -7,15 +7,23 @@ import { hash01 } from '../engine/rng';
 import { PALETTE } from '../palette';
 import type { Chimney, Window } from './hills';
 
-/** Rowing boat, moored on the near water, a small lamp at the bow. d: dark wood, w: wood, l: lamp. */
+/**
+ * Rowing boat seen from above at an angle, bow to the lower left, both oars out,
+ * a small lamp on the stern post. d: dark wood, w: wood, l: lamp.
+ */
 const BOAT: PixelMap = [
-  'll......................',
-  '.l.....................w',
-  'ww.....d.......d......ww',
-  'wddddddddddddddddddddddw',
-  '.wwwwwwwwwwwwwwwwwwwwww.',
-  '..wwwwwwwwwwwwwwwwwwww..',
-  '....dddddddddddddddd....',
+  '........................ll..',
+  '.......ww................l..',
+  '........w.............wwwww.',
+  '.........w.........wwwwddddw',
+  '..........w.....wwwwddddddww',
+  '...........w.wwwwdddddddddw.',
+  '..........wwwwdddddddddddw..',
+  '......wwwwdddddddddddddww...',
+  '..wwwwdddddddddddddwwww.w...',
+  'wwdddddddddddddwwww......w..',
+  '.wwwwwwwwwwwwww...........w.',
+  '...ddddddddddd............ww',
 ];
 const BOAT_PALETTE = { w: PALETTE.wood, d: PALETTE.woodDark, l: PALETTE.lantern } as const;
 
@@ -60,9 +68,9 @@ export class Cozy {
     this.boatBuf.destroy();
     this.boatBuf = new PixelBuffer(BOAT[0]!.length, BOAT.length + 2);
     this.boatBuf.blit(BOAT, BOAT_PALETTE, 0, 0);
-    for (let x = 5; x < BOAT[0]!.length - 5; x += 2) this.boatBuf.set(x, BOAT.length + 1, PALETTE.woodDark);
+    for (let x = 4; x < 14; x += 2) this.boatBuf.set(x, BOAT.length + 1, PALETTE.woodDark);
     this.boatSprite.texture = this.boatBuf.toTexture();
-    this.boat = { x: layout.centreX - Math.round(layout.width * (layout.landscape ? 0.16 : 0.3)), y: layout.lakeEnd - 12 };
+    this.boat = { x: layout.centreX - Math.round(layout.width * (layout.landscape ? 0.16 : 0.3)) - 8, y: layout.lakeEnd - 16 };
     this.boatSprite.position.set(this.boat.x, this.boat.y);
     this.boatGlow?.destroy();
     this.boatGlow = new Sprite(radialGlowTexture(64, PALETTE.lantern, 0.8));
@@ -165,7 +173,7 @@ export class Cozy {
     this.boatSprite.position.set(this.boat.x, this.boat.y + rock);
     if (this.boatGlow) {
       const css = this.layout.cssScale;
-      this.boatGlow.position.set((this.boat.x + 1) * css, (this.boat.y + rock + 0.5) * css);
+      this.boatGlow.position.set((this.boat.x + 25) * css, (this.boat.y + rock + 0.5) * css);
     }
   }
 }

@@ -5,7 +5,11 @@ import {
   FRAMES,
   LANTERN_H,
   LANTERN_W,
+  LARGE_H,
+  LARGE_PAPER_ROWS,
+  LARGE_W,
   LIT_PALETTE,
+  largeLanternMaps,
   PAPER_ROWS,
   SKY_LIGHT_PALETTE,
   SMALL_H,
@@ -20,10 +24,22 @@ import {
 export class LanternTextures {
   /** [frame][litRows] */
   readonly big: Texture[][] = [];
+  readonly large: Texture[][] = [];
   readonly small: Texture[] = [];
   readonly dot: Texture[] = [];
 
   constructor() {
+    for (let f = 0; f < FRAMES; f++) {
+      const row: Texture[] = [];
+      for (let lit = 0; lit <= LARGE_PAPER_ROWS; lit++) {
+        const buf = new PixelBuffer(LARGE_W, LARGE_H);
+        const { unlit, lit: litMap } = largeLanternMaps(f, lit / LARGE_PAPER_ROWS);
+        buf.blit(unlit, UNLIT_PALETTE, 0, 0);
+        buf.blit(litMap, LIT_PALETTE, 0, 0);
+        row.push(buf.toTexture());
+      }
+      this.large.push(row);
+    }
     for (let f = 0; f < FRAMES; f++) {
       const row: Texture[] = [];
       for (let lit = 0; lit <= PAPER_ROWS; lit++) {
@@ -47,12 +63,18 @@ export class LanternTextures {
     }
   }
 
+  largeFor(frame: number, fill: number): Texture {
+    const lit = Math.round(Math.max(0, Math.min(1, fill)) * LARGE_PAPER_ROWS);
+    return this.large[frame % FRAMES]?.[lit] ?? Texture.EMPTY;
+  }
+
   bigFor(frame: number, fill: number): Texture {
     const lit = Math.round(Math.max(0, Math.min(1, fill)) * PAPER_ROWS);
     return this.big[frame % FRAMES]?.[lit] ?? Texture.EMPTY;
   }
 
   destroy(): void {
+    for (const row of this.large) for (const t of row) t.destroy(true);
     for (const row of this.big) for (const t of row) t.destroy(true);
     for (const t of this.small) t.destroy(true);
     for (const t of this.dot) t.destroy(true);

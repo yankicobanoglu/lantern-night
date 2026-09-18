@@ -1,12 +1,17 @@
 import type { Layout } from '../engine/layout';
 import { COPY } from '../ritual/copy';
-import type { Lantern } from '../store/types';
+import type { SkyStatus } from '../scene/sprites/lantern';
 import { button, el, formatDate } from './dom';
+
+/** One light in tonight's sky: a stored wish (text and date) or a session-only light with no words kept. */
+export type SkyEntry = { id: string; sky: { x: number; y: number }; text: string | null; createdAt: string | null; status: SkyStatus };
 import { focusFirst } from './focus';
 
 /**
  * Your sky (SPEC section 4): heading, count, and one real button over every
- * stored light. Tapping a light shows its date and wish text.
+ * light in the sky, stored or not (review after the live check: the view now
+ * reads the scene, so it can never disagree with what is glowing up there).
+ * Tapping a light shows its date and wish text, or a line for a let-go light.
  */
 export class SkyView {
   readonly node: HTMLElement;
@@ -16,7 +21,7 @@ export class SkyView {
   private readonly cardDate: HTMLElement;
   private readonly cardText: HTMLElement;
   private readonly empty: HTMLElement;
-  private lanterns: Lantern[] = [];
+  private lanterns: SkyEntry[] = [];
   private layout: Layout | null = null;
   private selected: string | null = null;
 
@@ -48,7 +53,7 @@ export class SkyView {
     root.append(this.node);
   }
 
-  show(lanterns: Lantern[], layout: Layout): void {
+  show(lanterns: SkyEntry[], layout: Layout): void {
     this.lanterns = lanterns;
     this.layout = layout;
     this.selected = null;
@@ -57,7 +62,8 @@ export class SkyView {
     this.empty.hidden = lanterns.length > 0;
     this.lights.replaceChildren(
       ...lanterns.map((l) => {
-        const b = el('button', { type: 'button', class: 'sky-light', 'aria-label': `${formatDate(l.createdAt)}: ${l.text}`, 'aria-pressed': 'false', 'data-id': l.id });
+        const label = l.text ? `${l.createdAt ? formatDate(l.createdAt) : ''}: ${l.text}` : COPY.sky.letGoCard;
+        const b = el('button', { type: 'button', class: 'sky-light', 'aria-label': label, 'aria-pressed': 'false', 'data-id': l.id });
         b.addEventListener('click', () => this.select(l.id));
         return b;
       }),
@@ -92,8 +98,8 @@ export class SkyView {
     if (!l) return;
     this.selected = id;
     for (const b of Array.from(this.lights.children)) b.setAttribute('aria-pressed', String((b as HTMLElement).dataset['id'] === id));
-    this.cardDate.textContent = formatDate(l.createdAt);
-    this.cardText.textContent = l.text;
+    this.cardDate.textContent = l.createdAt ? formatDate(l.createdAt) : '';
+    this.cardText.textContent = l.text ?? COPY.sky.letGoCard;
     this.card.hidden = false;
   }
 

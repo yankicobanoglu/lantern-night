@@ -11,6 +11,10 @@ import { PALETTE } from '../../palette';
  */
 export const LANTERN_W = 18;
 export const LANTERN_H = 24;
+/** Resting size (review after the live check: the unlit lantern read too small). It shrinks to 18×24 as it rises. */
+export const LARGE_W = 26;
+export const LARGE_H = 34;
+export const LARGE_PAPER_ROWS = 28;
 export const SMALL_W = 9;
 export const SMALL_H = 12;
 export const DOT = 4;
@@ -37,6 +41,10 @@ export const UNLIT_PALETTE: MapPalette = {
   f: PALETTE.flame,
   y: PALETTE.lanternCore,
 };
+
+function setChar(row: string, x: number, ch: string): string {
+  return row.slice(0, x) + ch + row.slice(x + 1);
+}
 
 /** A wish lantern: wide rounded top, paper tapering to a bamboo ring, the flame in the opening. */
 const BODY: PixelMap = [
@@ -66,6 +74,67 @@ const BODY: PixelMap = [
   '......wwwwww......',
 ];
 
+/** Half-extent of the large paper body per row (x0..x1 inclusive), top cap to the ring. */
+const LARGE_PROFILE: readonly (readonly [number, number])[] = [
+  [9, 16],
+  [7, 18],
+  [5, 20],
+  [4, 21],
+  [3, 22],
+  [2, 23],
+  [1, 24],
+  [0, 25],
+  [0, 25],
+  [0, 25],
+  [0, 25],
+  [0, 25],
+  [0, 25],
+  [0, 25],
+  [0, 25],
+  [0, 25],
+  [0, 25],
+  [0, 25],
+  [1, 24],
+  [1, 24],
+  [1, 24],
+  [2, 23],
+  [2, 23],
+  [2, 23],
+  [3, 22],
+  [3, 22],
+  [4, 21],
+  [5, 20],
+];
+
+/** The large body: the same lantern drawn on a 26×34 grid, rim on the outline, paper inside. */
+export const LARGE_BODY: PixelMap = (() => {
+  const rows: string[] = [];
+  LARGE_PROFILE.forEach(([x0, x1], y) => {
+    let row = '.'.repeat(LARGE_W);
+    for (let x = x0; x <= x1; x++) row = setChar(row, x, y === 0 || x === x0 || x === x1 ? 'r' : 'p');
+    rows.push(row);
+  });
+  rows.push('.....wwwwwwwwwwwwwwww.....', '......woooooooooooow......', '', '', '.........woooooow.........', '..........wwwwww..........');
+  return rows;
+})();
+
+const LARGE_GLOW: readonly { cx: number; cy: number; rx: number; ry: number }[] = [
+  { cx: 12.5, cy: 19, rx: 5.4, ry: 6.2 },
+  { cx: 12.5, cy: 17.5, rx: 4.6, ry: 6.8 },
+  { cx: 11.8, cy: 19.6, rx: 6.0, ry: 5.3 },
+  { cx: 13.2, cy: 19, rx: 4.4, ry: 5.3 },
+];
+
+/** Large flame rows (30, 31) per frame. */
+const LARGE_FLAME_FULL: readonly (readonly [string, string])[] = [
+  ['......wooffffffffoow......', '.......wffyyyyyyffw.......'],
+  ['......woooffffffooow......', '.......wfyyffyyyffw.......'],
+  ['......wooofffffffoow......', '.......wffyyyyffffw.......'],
+  ['......woooffffffooow......', '.......wfyyyyyyfffw.......'],
+];
+const LARGE_FLAME_SMALL: readonly [string, string] = ['......woooooooooooow......', '.......wooooyyooooow......'];
+const LARGE_FLAME_NONE: readonly [string, string] = ['......woooooooooooow......', '.......wooooooooooow......'];
+
 /** Inner glow per frame: an ellipse of highlight low in the paper that breathes a little. */
 const GLOW: readonly { cx: number; cy: number; rx: number; ry: number }[] = [
   { cx: 8.5, cy: 13, rx: 3.6, ry: 4.2 },
@@ -85,9 +154,6 @@ const FLAME_FULL: readonly (readonly [string, string])[] = [
 const FLAME_SMALL: readonly [string, string] = ['....woooooooow....', '.....wooyyoow.....'];
 const FLAME_NONE: readonly [string, string] = ['....woooooooow....', '.....woooooow.....'];
 
-function setChar(row: string, x: number, ch: string): string {
-  return row.slice(0, x) + ch + row.slice(x + 1);
-}
 
 /**
  * Pixel map for a lantern with `litRows` of paper lit from the bottom
@@ -111,6 +177,37 @@ export function lanternMap(frame: number, litRows = PAPER_ROWS): PixelMap {
   rows[21] = flame[0];
   rows[22] = flame[1];
   return rows;
+}
+
+/** Large lantern map (26×34) with `litRows` of 28 paper rows lit from the bottom and flicker `frame`. */
+export function largeLanternMap(frame: number, litRows = LARGE_PAPER_ROWS): PixelMap {
+  const f = ((frame % FRAMES) + FRAMES) % FRAMES;
+  const rows = LARGE_BODY.map((r) => r);
+  const g = LARGE_GLOW[f] ?? LARGE_GLOW[0]!;
+  for (let y = 0; y < LARGE_PAPER_ROWS; y++) {
+    const row = rows[y] ?? '';
+    let out = row;
+    for (let x = 0; x < row.length; x++) {
+      const dx = (x + 0.5 - g.cx) / g.rx;
+      const dy = (y + 0.5 - g.cy) / g.ry;
+      if (row[x] === 'p' && dx * dx + dy * dy <= 1) out = setChar(out, x, 'c');
+    }
+    rows[y] = out;
+  }
+  const flame = litRows <= 0 ? LARGE_FLAME_NONE : litRows < LARGE_PAPER_ROWS / 2 ? LARGE_FLAME_SMALL : (LARGE_FLAME_FULL[f] ?? LARGE_FLAME_FULL[0]!);
+  rows[30] = flame[0];
+  rows[31] = flame[1];
+  return rows;
+}
+
+/** Split of the large map into unlit (top) and lit (bottom) parts for a fill level. */
+export function largeLanternMaps(frame: number, fill: number): { unlit: PixelMap; lit: PixelMap; litRows: number } {
+  const clamped = Math.max(0, Math.min(1, fill));
+  const litRows = Math.round(clamped * LARGE_PAPER_ROWS);
+  const map = largeLanternMap(frame, litRows);
+  const split = LARGE_PAPER_ROWS - litRows;
+  const blank = '.'.repeat(LARGE_W);
+  return { unlit: map.map((row, y) => (y < split ? row : blank)), lit: map.map((row, y) => (y >= split ? row : blank)), litRows };
 }
 
 /** Split of the lantern map into unlit (top) and lit (bottom) parts for a fill level. */

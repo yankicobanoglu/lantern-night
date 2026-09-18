@@ -21,7 +21,7 @@ export type Layout = {
   moon: { x: number; y: number };
   /** Composition centre column in art px (the lantern's spot on the shore). */
   centreX: number;
-  /** Where an unlit lantern waits, in art px (centre of the 18×24 sprite), standing on the shore. */
+  /** Where an unlit lantern waits, in art px (centre of the 26×34 sprite), held just above the shore. */
   lanternRest: { x: number; y: number };
 };
 
@@ -61,6 +61,6 @@ export function computeLayout(cssWidth: number, cssHeight: number, dpr: number):
     lakeEnd,
     moon,
     centreX,
-    lanternRest: { x: centreX, y: lakeEnd - 11 },
+    lanternRest: { x: centreX, y: lakeEnd - 26 },
   };
 }

@@ -52,7 +52,8 @@ describe('stepRise', () => {
   });
 
   it('steps through the three sprite sizes', () => {
-    expect(sizeStage(0)).toBe('big');
+    expect(sizeStage(0)).toBe('large');
+    expect(sizeStage(0.3)).toBe('big');
     expect(sizeStage(0.5)).toBe('small');
     expect(sizeStage(0.9)).toBe('dot');
   });
