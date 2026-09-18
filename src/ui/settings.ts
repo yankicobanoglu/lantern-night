@@ -80,8 +80,12 @@ export class SettingsSheet {
         ]),
         this.confirm,
         el('div', { class: 'row' }, [button(COPY.settings.close, 'primary small', () => handlers.onClose())]),
+        el('p', { class: 'legal', text: COPY.settings.legal }),
       ]),
     ]);
+    this.node.addEventListener('click', (e) => {
+      if (e.target === this.node) handlers.onClose();
+    });
     root.append(this.node);
   }
 

@@ -9,11 +9,13 @@ import type { Chimney, Window } from './hills';
 
 /** Rowing boat, moored on the near water, a small lamp at the bow. d: dark wood, w: wood, l: lamp. */
 const BOAT: PixelMap = [
-  'l..............',
-  'w.............w',
-  'wwdddddddddddww',
-  '.wwwwwwwwwwwww.',
-  '..ddddddddddd..',
+  'll......................',
+  '.l.....................w',
+  'ww.....d.......d......ww',
+  'wddddddddddddddddddddddw',
+  '.wwwwwwwwwwwwwwwwwwwwww.',
+  '..wwwwwwwwwwwwwwwwwwww..',
+  '....dddddddddddddddd....',
 ];
 const BOAT_PALETTE = { w: PALETTE.wood, d: PALETTE.woodDark, l: PALETTE.lantern } as const;
 
@@ -58,16 +60,16 @@ export class Cozy {
     this.boatBuf.destroy();
     this.boatBuf = new PixelBuffer(BOAT[0]!.length, BOAT.length + 2);
     this.boatBuf.blit(BOAT, BOAT_PALETTE, 0, 0);
-    for (let x = 2; x < BOAT[0]!.length - 2; x += 2) this.boatBuf.set(x, BOAT.length + 1, PALETTE.woodDark);
+    for (let x = 5; x < BOAT[0]!.length - 5; x += 2) this.boatBuf.set(x, BOAT.length + 1, PALETTE.woodDark);
     this.boatSprite.texture = this.boatBuf.toTexture();
-    this.boat = { x: layout.centreX - Math.round(layout.width * (layout.landscape ? 0.16 : 0.3)), y: layout.lakeEnd - 10 };
+    this.boat = { x: layout.centreX - Math.round(layout.width * (layout.landscape ? 0.16 : 0.3)), y: layout.lakeEnd - 12 };
     this.boatSprite.position.set(this.boat.x, this.boat.y);
     this.boatGlow?.destroy();
     this.boatGlow = new Sprite(radialGlowTexture(64, PALETTE.lantern, 0.8));
     this.boatGlow.anchor.set(0.5);
     this.boatGlow.blendMode = 'add';
-    this.boatGlow.width = 10 * layout.cssScale;
-    this.boatGlow.height = 10 * layout.cssScale;
+    this.boatGlow.width = 12 * layout.cssScale;
+    this.boatGlow.height = 12 * layout.cssScale;
     this.boatGlow.alpha = 0.45;
     this.light.addChild(this.boatGlow);
 
@@ -163,7 +165,7 @@ export class Cozy {
     this.boatSprite.position.set(this.boat.x, this.boat.y + rock);
     if (this.boatGlow) {
       const css = this.layout.cssScale;
-      this.boatGlow.position.set((this.boat.x + 0.5) * css, (this.boat.y + rock + 0.5) * css);
+      this.boatGlow.position.set((this.boat.x + 1) * css, (this.boat.y + rock + 0.5) * css);
     }
   }
 }

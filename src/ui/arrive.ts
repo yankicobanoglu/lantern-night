@@ -12,6 +12,7 @@ export class ArriveScreen {
 
   constructor(root: HTMLElement, onBegin: () => void) {
     this.title = el('h1', { class: 'title', text: COPY.title });
+    this.title.addEventListener('click', () => this.title.classList.add('gone'));
     this.line = el('p', { class: 'line' });
     this.banner = el('p', { class: 'banner', hidden: true });
     this.node = el('section', { class: 'screen arrive', 'aria-label': 'Arrive' }, [
@@ -26,6 +27,7 @@ export class ArriveScreen {
     this.banner.hidden = b === null;
     this.banner.textContent = b ?? '';
     this.node.classList.add('on');
+    this.title.classList.remove('gone');
     this.title.classList.add('on');
     focusFirst(this.node);
   }

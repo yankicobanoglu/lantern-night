@@ -4,6 +4,11 @@
  */
 export const BASE = '/lantern-night/';
 
+/** The site's own address, for the share text (never fetched). */
+export function siteUrl(): string {
+  return typeof location === 'undefined' ? BASE : new URL(BASE, location.origin).href;
+}
+
 /** Target internal height of the pixel world in art pixels (portrait). */
 export const INTERNAL_HEIGHT = 320;
 
@@ -58,8 +63,9 @@ export const WATCH_BUTTONS_MIN_PROGRESS = NEXT_LANTERN_MIN_PROGRESS;
 export const WISH_FADE_MS = 3000;
 
 /** Shooting stars (SPEC section 7, Legibility). */
-export const STAR_INTERVAL_MIN_S = 45;
-export const STAR_INTERVAL_MAX_S = 120;
+/** Review after M5: 45–120 s felt too scarce; 20–60 s keeps them random but present. */
+export const STAR_INTERVAL_MIN_S = 20;
+export const STAR_INTERVAL_MAX_S = 60;
 export const STAR_FIRST_SESSION_MAX_S = 60;
 export const STAR_TWINKLE_S = 0.3;
 export const STAR_CROSS_S = 1.4;

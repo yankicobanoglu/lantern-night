@@ -47,6 +47,9 @@ export class ShareSheet {
         el('div', { class: 'row' }, [this.shareBtn, button(COPY.settings.close, 'ghost small', () => handlers.onClose())]),
       ]),
     ]);
+    this.node.addEventListener('click', (e) => {
+      if (e.target === this.node) handlers.onClose();
+    });
     root.append(this.node);
   }
 

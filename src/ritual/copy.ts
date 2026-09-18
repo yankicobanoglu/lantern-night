@@ -107,16 +107,22 @@ export const COPY = {
     /** Mute toggle labels (not in the deck; proposed in PLAN-M4). */
     soundOn: 'Sound on',
     soundOff: 'Sound off',
+    /** Small print at the foot of Settings (not in the deck; proposed after the M5 review). */
+    legal: 'Privacy: your lanterns stay on this device and never leave it. Terms: Lantern Night is offered as is, for reflection only. Back up your sky now and then.',
   },
   share: {
     button: 'Share my sky',
     includeWish: 'Include my wish',
+    /** Text beside the shared image (not in the deck; proposed after the M5 review). */
+    text: (url: string) => `Light a lantern. Let it rise. ${url}`,
   },
   system: {
     storageUnavailable: "Your lanterns can't be saved in this browser mode. They'll still rise tonight.",
     installIos: 'Keep Lantern Night on your home screen so your sky stays safe: tap Share, then Add to Home Screen.',
     installOther: 'Install Lantern Night so your sky stays safe.',
     install: 'Install',
+    /** One-time sound hint after Begin (not in the deck; proposed after the M5 review). */
+    soundHint: 'Turn your sound on to hear the evening.',
   },
   menu: {
     open: 'Menu',

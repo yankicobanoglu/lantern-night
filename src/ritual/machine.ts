@@ -2,6 +2,7 @@
  * Session state machine (SPEC section 3):
  * arrive → (return) → intention → light → release → watch → goodnight.
  * Your sky and Settings are overlays and never change the state.
+ * intention → arrive is the way back without lighting (review after M5).
  */
 export type State = 'loading' | 'arrive' | 'return' | 'intention' | 'light' | 'release' | 'watch' | 'goodnight';
 
@@ -9,7 +10,7 @@ const NEXT: Record<State, readonly State[]> = {
   loading: ['arrive'],
   arrive: ['return', 'intention'],
   return: ['intention'],
-  intention: ['light'],
+  intention: ['light', 'arrive'],
   light: ['release'],
   release: ['watch'],
   watch: ['intention', 'goodnight'],

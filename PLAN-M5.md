@@ -109,3 +109,22 @@ With the governor live on the heavy scene it stays at level 3 here (60 fps after
 - The governor never steps back up in a session (the spec has no rule for that); a reload starts at full.
 - Screenshot tests pin `quality=3` through the helpers: the software GPU in headless mode is slow enough to trip the governor otherwise.
 - `.claude/launch.json` gained a `preview` entry (port 4174) for the measurement script and manual checks of the built site.
+
+## Review fixes after the live check (2026-09-18)
+
+1. **Your sky showed one light where two were lit.** A lantern still on its way already had its ring at its final sky spot, so the ring sat empty until the lantern arrived. The ring now travels with the rising lantern and settles with it. (Let-go lanterns are never stored, by section 6, so they do not appear here.)
+2. **Intention panel 220 px to the right on macOS Safari.** With Gentle motion on (the Settings switch, or the system's Reduce motion) the wide layout dropped its centring transform. Fixed in CSS; covered by a desktop test.
+3. **Shooting-star hint.** It only appeared after a star passed untapped, once per device. It now shows as the first star appears.
+4. **Moon phase** is live: the mean-phase model gives new moon 11 Sep and full moon 26 Sep 2026, matching the almanac; today is first quarter.
+5. **Share text** carries the site address: "Light a lantern. Let it rise. https://…/lantern-night/" (copy proposal, `COPY.share.text`).
+6. **Tap the empty scene while writing** to go back to the start (new transition intention → arrive). If the keyboard is up, the first tap only puts it away.
+7. **Shooting stars** every 20–60 s instead of 45–120 s (section 7 deviation, on request).
+8. **iOS silent switch.** Web Audio follows the ringer switch unless a media element is playing, so a looping one-second silent WAV, generated in code, plays alongside the soundscape and pauses with Sound off or a hidden tab. To confirm on the phone.
+9. **Sound hint** once after Begin: "Turn your sound on to hear the evening." (copy proposal, `COPY.system.soundHint`; setting `soundHintShown`).
+10. **Tap anywhere to close**: the corner menu closes on any tap outside it (and that tap does nothing else); Your sky, Settings and the share sheet close on a tap on their backdrop.
+11. **Settings small print** (copy proposal, `COPY.settings.legal`): "Privacy: your lanterns stay on this device and never leave it. Terms: Lantern Night is offered as is, for reflection only. Back up your sky now and then." at 0.78 rem, 60 % opacity.
+12. **Welcome line and moon banner** centred.
+13. **Title** mid-screen (42 % down, in the sky under the moon) at 2.8 rem; a tap on it fades it out over 1.4 s with a slight lift and blur.
+14. **Boat** redrawn at 24×7 art px (was 15×5) with a lamp post at the bow and two seats.
+
+Tests: `e2e/reviewM5.spec.ts` (items 1, 2, 5, 6, 9, 10, 11, 12, 13), `starAndMoon.spec.ts` updated for item 3.

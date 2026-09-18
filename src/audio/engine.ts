@@ -3,6 +3,35 @@ import { BELL_PARTIALS, dbToGain, flameCurve, MASTER_DB, MASTER_FADE_S, pickChim
 
 export type AudioState = { started: boolean; running: boolean; muted: boolean };
 
+/** One second of 8 kHz 8-bit silence as a WAV data URL, built here so no audio file ships. */
+export function silentWav(): string {
+  const rate = 8000;
+  const n = rate;
+  const buf = new ArrayBuffer(44 + n);
+  const v = new DataView(buf);
+  const str = (o: number, s: string): void => {
+    for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i));
+  };
+  str(0, 'RIFF');
+  v.setUint32(4, 36 + n, true);
+  str(8, 'WAVE');
+  str(12, 'fmt ');
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true);
+  v.setUint32(28, rate, true);
+  v.setUint16(32, 1, true);
+  v.setUint16(34, 8, true);
+  str(36, 'data');
+  v.setUint32(40, n, true);
+  new Uint8Array(buf, 44).fill(128);
+  let bin = '';
+  const bytes = new Uint8Array(buf);
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i] ?? 0);
+  return `data:audio/wav;base64,${btoa(bin)}`;
+}
+
 /**
  * The soundscape (SPEC section 7, Sound), all generated with Web Audio.
  * One AudioContext, created on the first user gesture and resumed on later
@@ -19,6 +48,11 @@ export class AudioEngine {
   private flameFilter: BiquadFilterNode | null = null;
   private enabled = true;
   private rnd = Math.random;
+  /**
+   * iOS routes Web Audio through the ringer switch unless a media element is
+   * playing. A looping, generated, silent WAV keeps the session in playback mode.
+   */
+  private keepAlive: HTMLAudioElement | null = null;
 
   constructor() {
     if (typeof document === 'undefined') return;
@@ -28,8 +62,13 @@ export class AudioEngine {
     document.addEventListener('visibilitychange', () => {
       const ctx = this.ctx;
       if (!ctx) return;
-      if (document.hidden) void ctx.suspend().catch(() => undefined);
-      else if (this.enabled) void ctx.resume().catch(() => undefined);
+      if (document.hidden) {
+        void ctx.suspend().catch(() => undefined);
+        this.keepAlive?.pause();
+      } else if (this.enabled) {
+        void ctx.resume().catch(() => undefined);
+        void this.keepAlive?.play().catch(() => undefined);
+      }
     });
   }
 
@@ -52,10 +91,12 @@ export class AudioEngine {
     g.setValueAtTime(g.value, now);
     if (on) {
       void this.ctx.resume().catch(() => undefined);
+      void this.keepAlive?.play().catch(() => undefined);
       this.ambient?.start();
       g.linearRampToValueAtTime(dbToGain(MASTER_DB), now + MASTER_FADE_S);
     } else {
       g.linearRampToValueAtTime(0, now + 0.3);
+      this.keepAlive?.pause();
       window.setTimeout(() => {
         if (!this.enabled) this.ambient?.stop();
       }, 400);
@@ -96,6 +137,14 @@ export class AudioEngine {
       }
     }
     if (this.ctx.state !== 'running' && this.enabled) void this.ctx.resume().catch(() => undefined);
+    if (!this.keepAlive && typeof Audio !== 'undefined') {
+      const a = new Audio(silentWav());
+      a.loop = true;
+      a.setAttribute('playsinline', '');
+      a.preload = 'auto';
+      this.keepAlive = a;
+    }
+    if (this.enabled && this.keepAlive && this.keepAlive.paused) void this.keepAlive.play().catch(() => undefined);
   }
 
   /** The hold fill changed (0–1): the whoosh grows with it and eases back when the hold lets go. */

@@ -1,5 +1,5 @@
 import type { Renderer } from 'pixi.js';
-import { LIGHT_ARC_S, STAR_FIRST_SESSION_MAX_S, STAR_INTERVAL_MAX_S, STAR_INTERVAL_MIN_S, WATCH_BUTTONS_MIN_PROGRESS, WATCH_BUTTONS_SKY_FRACTION } from '../config';
+import { LIGHT_ARC_S, siteUrl, STAR_FIRST_SESSION_MAX_S, STAR_INTERVAL_MAX_S, STAR_INTERVAL_MIN_S, WATCH_BUTTONS_MIN_PROGRESS, WATCH_BUTTONS_SKY_FRACTION } from '../config';
 import type { AudioEngine } from '../audio/engine';
 import type { Layout } from '../engine/layout';
 import { systemMotionLevel, type MotionLevel } from '../engine/motion';
@@ -87,6 +87,8 @@ export class Session {
   private nextStarIn = Infinity;
   private goodnightAt = 0;
   private installShownThisSession = false;
+  private starWasActive = false;
+  private fieldFocusedAtDown = false;
   /** Session clock for the light arc, in scene time (speed applies). */
   private sessionMs = 0;
 
@@ -142,10 +144,22 @@ export class Session {
       }
     });
     root.append(this.veil, this.goodnightLine);
+    // Intention: a tap on the empty scene goes back to the start without lighting (review after M5).
+    deps.canvas.addEventListener('pointerdown', () => {
+      // The field loses focus on pointerdown, before the click: remember whether the keyboard was up.
+      this.fieldFocusedAtDown = document.activeElement instanceof HTMLTextAreaElement;
+    });
+    deps.canvas.addEventListener('click', () => this.tapOutside());
     this.skyView = new SkyView(
       root,
       () => this.closeOverlays(),
       () => this.openShare(this.skyView.selectedWish),
+      (id) => {
+        const rising = scene.lanterns.rising.find((r) => r.storedId === id);
+        if (!rising) return null;
+        const L = deps.layout();
+        return { x: rising.x * L.cssScale, y: rising.y * L.cssScale };
+      },
     );
     this.settings = new SettingsSheet(root, {
       onChange: (patch) => void this.changeSettings(patch),
@@ -157,7 +171,7 @@ export class Session {
     this.share = new ShareSheet(root, {
       render: (includeWish) => this.renderShare(includeWish ? this.shareWish : null),
       toFile: async (canvas) => new File([await canvasToBlob(canvas)], shareFileName(this.deps.now()), { type: 'image/png' }),
-      share: (file) => void shareOrDownload(file, file.name, COPY.title),
+      share: (file) => void shareOrDownload(file, file.name, COPY.title, COPY.share.text(siteUrl())),
       onClose: () => this.closeShare(),
     });
     this.menu = new Menu(root, {
@@ -253,12 +267,31 @@ export class Session {
     const { store } = this.deps;
     void store.saveSettings({ sessions: store.settings.sessions + 1 }).catch(() => undefined);
     this.arrive.hide();
+    // One-time hint, like the shooting star's: the evening has sound (review after M5).
+    if (store.settings.sound && !store.settings.soundHintShown) {
+      void store.saveSettings({ soundHintShown: true }).catch(() => undefined);
+      this.toast.show(COPY.system.soundHint, 7000);
+    }
     const due = store.due(this.deps.now())[0];
     if (due && this.machine.go('return')) {
       this.returnCard.show(due);
       return;
     }
     this.showIntention();
+  }
+
+  /** A tap on the scene while writing: first put the keyboard away, then go back to the start. */
+  private tapOutside(): void {
+    if (this.machine.state !== 'intention') return;
+    if (this.skyView.isOpen || this.settings.isOpen || this.share.isOpen || this.menu.isOpen) return;
+    if (this.fieldFocusedAtDown) {
+      this.fieldFocusedAtDown = false;
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      return;
+    }
+    if (!this.machine.go('arrive')) return;
+    this.intention.hide();
+    this.showArrive();
   }
 
   private showIntention(): void {
@@ -507,7 +540,8 @@ export class Session {
     this.starUi.tapped(x, y);
   }
 
-  private starFinishedUntapped(): void {
+  /** The one-time hint shows as the first star appears, so nobody has to miss one to learn it (review after M5). */
+  private starHint(): void {
     const { store } = this.deps;
     if (store.settings.starHintShown) return;
     void store.saveSettings({ starHintShown: true }).catch(() => undefined);
@@ -530,8 +564,11 @@ export class Session {
       this.nextStarIn -= (dtMs / 1000) * scene.speed;
       if (this.nextStarIn <= 0) this.trySpawnStar();
     }
-    if (scene.starDone) this.starFinishedUntapped();
+    const starActive = scene.star.active;
+    if (starActive && !this.starWasActive) this.starHint();
+    this.starWasActive = starActive;
     this.starUi.follow(scene.star.head());
+    if (this.skyView.isOpen && scene.lanterns.rising.length > 0) this.skyView.place(this.deps.layout());
     if (state === 'watch' && this.released && !this.watchShown && this.farEnough(this.released)) {
       this.watchShown = true;
       this.lightUi.watch();

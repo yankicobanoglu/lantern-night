@@ -211,27 +211,41 @@ textarea:focus-visible {
   align-items: center;
 }
 
-/* Title over the sky. */
+/* Title over the sky: mid-screen, tappable, and it leaves softly when tapped (review after M5). */
 .title {
   position: absolute;
-  top: calc(2.5% + var(--safe-top));
+  top: 42%;
   left: 0;
   right: 0;
   margin: 0;
+  transform: translateY(-50%);
   text-align: center;
   font-family: var(--pixel);
   font-weight: 400;
-  font-size: 2.2rem;
+  font-size: 2.8rem;
   letter-spacing: 0.02em;
   color: var(--cream);
   text-shadow:
     0 2px 12px rgba(27, 27, 58, 0.9),
     0 0 24px rgba(255, 181, 71, 0.25);
   opacity: 0;
-  transition: opacity 900ms var(--ease);
+  pointer-events: none;
+  transition:
+    opacity 900ms var(--ease),
+    transform 1400ms var(--ease),
+    filter 1400ms var(--ease);
 }
 .title.on {
   opacity: 1;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.title.gone {
+  opacity: 0;
+  transform: translateY(calc(-50% - 18px));
+  filter: blur(6px);
+  pointer-events: none;
+  transition-duration: 1400ms;
 }
 .banner {
   margin: 0;
@@ -923,4 +937,34 @@ textarea:focus-visible {
 }
 #ui.gentle .screen {
   transform: none;
+}
+/* Review after M5: on wide screens the centring transform must stay, or the panel sits 220 px right. */
+@media (min-width: 700px) {
+  #ui.gentle .screen,
+  #ui.gentle .screen.on {
+    transform: translateX(-50%);
+  }
+}
+/* Overlays take the taps on their backdrop so a tap anywhere closes them; their text blocks let taps through to the rings. */
+.overlay.on {
+  pointer-events: auto;
+}
+.overlay .top,
+.overlay .bottom {
+  pointer-events: none;
+}
+.overlay .bottom > * {
+  pointer-events: auto;
+}
+.arrive .line,
+.arrive .banner {
+  text-align: center;
+}
+/* Small print at the foot of Settings. */
+.legal {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  opacity: 0.6;
+  text-align: center;
 }

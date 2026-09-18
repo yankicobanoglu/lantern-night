@@ -21,6 +21,8 @@ export type Settings = {
   lastBackupAt: string | null;
   /** The one-time shooting-star hint has been shown. */
   starHintShown: boolean;
+  /** The one-time sound hint has been shown. */
+  soundHintShown: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -32,6 +34,7 @@ export const DEFAULT_SETTINGS: Settings = {
   persistGranted: null,
   lastBackupAt: null,
   starHintShown: false,
+  soundHintShown: false,
 };
 
 export const RETURN_DAYS = 30;

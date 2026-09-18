@@ -20,7 +20,13 @@ export class SkyView {
   private layout: Layout | null = null;
   private selected: string | null = null;
 
-  constructor(root: HTMLElement, onClose: () => void, onShare: () => void) {
+  constructor(
+    root: HTMLElement,
+    onClose: () => void,
+    onShare: () => void,
+    /** CSS-px position of a lantern still on its way to this stored light, or null once it has arrived. */
+    private readonly track: (id: string) => { x: number; y: number } | null = () => null,
+  ) {
     this.count = el('p', { class: 'line hand' });
     this.lights = el('div', { class: 'lights' });
     this.cardDate = el('p', { class: 'date' });
@@ -36,6 +42,9 @@ export class SkyView {
         el('div', { class: 'row' }, [button(COPY.share.button, 'ghost small', onShare, { 'data-action': 'share' }), button(COPY.sky.close, 'ghost small', onClose)]),
       ]),
     ]);
+    this.node.addEventListener('click', (e) => {
+      if (e.target === this.node) onClose();
+    });
     root.append(this.node);
   }
 
@@ -71,8 +80,10 @@ export class SkyView {
       const b = buttons[i] as HTMLElement;
       const l = this.lanterns[i];
       if (!l) continue;
-      b.style.left = `${l.sky.x * layout.width * css}px`;
-      b.style.top = `${l.sky.y * layout.horizon * css}px`;
+      // A lantern still rising keeps its ring with it until it settles at its sky point.
+      const live = this.track(l.id);
+      b.style.left = `${live ? live.x : l.sky.x * layout.width * css}px`;
+      b.style.top = `${live ? live.y : l.sky.y * layout.horizon * css}px`;
     }
   }
 

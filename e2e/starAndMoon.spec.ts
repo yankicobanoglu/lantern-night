@@ -2,10 +2,12 @@ import { expect, test } from '@playwright/test';
 import { openRitual, readIdb, saveScreenshots } from './helpers';
 
 test.describe('shooting star', () => {
-  test('is tappable at the edge of its 64 px hit area, and a missed one earns the hint once', async ({ page }, testInfo) => {
+  test('is tappable at the edge of its 64 px hit area, and the first one brings the hint once', async ({ page }, testInfo) => {
     await openRitual(page, 'date=2024-09-10&star=now');
     // The star spawns on its own during arrive. Freeze the scene clock while it is crossing.
     await page.waitForFunction(() => window.__lantern!.star() !== null, undefined, { timeout: 8000 });
+    // The one-time hint arrives with the first star (review after M5), so nobody has to miss one to learn it.
+    await expect(page.locator('.toast')).toHaveText('Tap a shooting star to make a quick wish.');
     await page.evaluate(() => window.__lantern!.speed(0));
     await page.waitForTimeout(100);
     const head = (await page.evaluate(() => window.__lantern!.star()))!;
@@ -28,17 +30,13 @@ test.describe('shooting star', () => {
     expect(await page.evaluate(() => window.__lantern!.state())).toBe('arrive');
     // Nothing stored.
     expect(await readIdb(page, 'lanterns')).toBeUndefined();
-    const settings = (await readIdb(page, 'settings')) as { starHintShown?: boolean } | undefined;
-    expect(settings?.starHintShown ?? false).toBe(false);
-
-    // A star that passes untapped: the one-time hint.
-    await page.evaluate(() => window.__lantern!.speed(1));
-    expect(await page.evaluate(() => window.__lantern!.spawnStar())).toBe(true);
-    await expect(page.locator('.toast')).toHaveText('Tap a shooting star to make a quick wish.', { timeout: 8000 });
     await expect.poll(() => readIdb(page, 'settings')).toMatchObject({ starHintShown: true });
+
+    // The next star brings no hint.
+    await page.evaluate(() => window.__lantern!.speed(1));
     await page.locator('.toast').evaluate((n) => n.classList.remove('on'));
     expect(await page.evaluate(() => window.__lantern!.spawnStar())).toBe(true);
-    await page.waitForTimeout(3800);
+    await page.waitForTimeout(600);
     await expect(page.locator('.toast')).toBeHidden();
   });
 
