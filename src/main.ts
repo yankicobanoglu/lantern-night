@@ -72,15 +72,28 @@ async function boot(): Promise<void> {
   if (opts.showFps) mountFpsOverlay(stats, cpu, governor);
 
   let resizeTimer = 0;
-  let appliedW = window.innerWidth;
-  let appliedH = window.innerHeight;
+  // Seeded from what the renderer actually applied, not from the window as it is now: the viewport can
+  // change while `createApp` and the store are awaited, and a snapshot taken here would agree with the
+  // window while the canvas kept its old size, with no resize event to correct it (seen live on a pane
+  // that was still settling at load: a 300x150 scene in a 1024x768 window). The per-frame check below
+  // then catches the difference on the first frame.
+  let appliedW = Math.round(app.renderer.screen.width);
+  let appliedH = Math.round(app.renderer.screen.height);
   const onResize = (): void => {
+    // Claim the new size straight away. The per-frame check below runs about every 16 ms, so if this
+    // waited for the debounced callback the check would keep re-arming the timer and the resize would
+    // never run at all: on the live site the canvas kept its old size after a window resize or a
+    // rotation, and the scene was simply cropped.
+    appliedW = window.innerWidth;
+    appliedH = window.innerHeight;
     window.clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => {
-      appliedW = window.innerWidth;
-      appliedH = window.innerHeight;
-      app.renderer.resize(window.innerWidth, window.innerHeight);
-      layout = computeLayout(window.innerWidth, window.innerHeight, app.renderer.resolution);
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      appliedW = w;
+      appliedH = h;
+      app.renderer.resize(w, h);
+      layout = computeLayout(w, h, app.renderer.resolution);
       host.scene.resize(layout, session.motion());
       host.scene.setMoonFrame(frameForNow(opts));
       session.resize(layout);

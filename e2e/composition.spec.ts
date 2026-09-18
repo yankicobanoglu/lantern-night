@@ -56,3 +56,30 @@ test('scene composition matches SPEC section 7', async ({ page }, testInfo) => {
   await saveScreenshots(page, testInfo, 'composition');
   expect(errors, errors.join('\n')).toEqual([]);
 });
+
+test('the world follows the window: a resize after load reaches the renderer and the layout', async ({ page }) => {
+  // Two faults seen on the live site, both here. The scene stayed at the size it was built with after a
+  // window resize (a phone rotation does the same), because the per-frame size check re-armed the 80 ms
+  // debounce on every frame, so the resize never ran. And the renderer could start at a size the window
+  // never had, because the check's baseline was read after the renderer was made rather than from it.
+  const start = page.viewportSize()!;
+  await openScene(page, 'date=2026-09-17');
+  const canvasSize = async (): Promise<{ w: number; h: number }> =>
+    page.evaluate(() => {
+      const c = document.getElementById('world') as HTMLCanvasElement;
+      return { w: c.clientWidth, h: c.clientHeight };
+    });
+  expect(await canvasSize()).toEqual({ w: start.width, h: start.height });
+
+  const turned = { width: start.height, height: start.width };
+  await page.setViewportSize(turned);
+  await expect.poll(canvasSize, { timeout: 5_000 }).toEqual({ w: turned.width, h: turned.height });
+  // The world was rebuilt for the new shape, not just stretched.
+  const l = await getLayout(page);
+  expect(l.width * l.cssScale).toBeGreaterThanOrEqual(turned.width);
+  expect(l.height * l.cssScale).toBeGreaterThanOrEqual(turned.height);
+  expect(l.horizon / l.height).toBeCloseTo(0.55, 1);
+
+  await page.setViewportSize(start);
+  await expect.poll(canvasSize, { timeout: 5_000 }).toEqual({ w: start.width, h: start.height });
+});
