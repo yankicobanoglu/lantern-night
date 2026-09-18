@@ -126,6 +126,9 @@ test.describe('sound', () => {
 
 test.describe('install hint and persistent storage', () => {
   test('iOS Safari: shown after the first lantern on the first visit, again on the third, never in between', async ({ page }, testInfo) => {
+    // Four whole rituals in one test, each with its 4 s hold: it lands within a second or two of the
+    // default 60 s budget and flaked once, so give it room instead of leaving it a coin flip.
+    test.slow();
     const q = `${QUIET}&install=ios`;
     await openRitual(page, q);
     expect(await page.evaluate(() => window.__lantern!.install())).toEqual({ path: 'ios', hintCount: 0 });

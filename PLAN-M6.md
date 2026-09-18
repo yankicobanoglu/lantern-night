@@ -122,7 +122,7 @@ README.md, ROADMAP.md
 
 - Unit: 96 Vitest tests pass (14 new: showers and supermoon fixtures, the 36 px moon disc, the water lantern maps, the two fields). End-to-end: 280 test runs across the four projects, 250 passing and 30 project-specific skips (the M1–M5 suites unchanged); the keyboard-only run is untouched because the Scene row sits below Text size. New specs: `scenes.spec.ts` (the water lantern waits, lights from the bottom, drifts inside the lake band, settles as a light on the water; Your sky rings land on the lake; the setting is stored, swaps the world live with every light carried over, survives a reload; a swap mid-watch settles the lantern and keeps the buttons; the share image composes the water scene) and `nightEvents.spec.ts` (the Perseids divide the scheduled interval by 3; an ordinary night does not; 2024-10-17 draws a 36 px full moon and 2024-02-24 a 32 px one; `?supermoon` pins it). Screenshots and squint copies in `e2e/output/` (`*-water-*`, `*-supermoon`, `*-settings-scene`).
 - Bundle: main JS 110.2 KB gzipped (+5.5 KB over M5: the second sprite set, the fields, the host and the night events). Budget is 350 KB.
-- Crickets: the cricket bus now sits at `CRICKET_LEVEL` 0.7 (about −3 dB); envelopes unchanged.
+- Crickets: the cricket bus sat at `CRICKET_LEVEL` 0.7 (about −3 dB) in the first pass; superseded at review, see the note at the end.
 
 **Deviations and notes for review.**
 - Copy proposals in use (all marked in `copy.ts`): Settings "Scene", "Sky lanterns", "Water lanterns"; water scene only: "Beautiful. Now breathe out, and let it drift." and "Let it drift". Not built, for a decision: a moon-label line on shower and supermoon nights.
@@ -130,4 +130,6 @@ README.md, ROADMAP.md
 - The scene setting is additive to `Settings`; old backups and stores read as `sky`. The lantern record and the backup version are unchanged.
 - Fixes taken in passing from the review (1.2): Your sky after a restore or a clear now uses the one derivation, and a session-only light's id is its seed, not its index.
 - The supermoon rule uses a mean anomalistic month from a reference perigee; the five almanac supermoons and two micromoons in the fixtures agree. A night either way is possible in edge years and is invisible to a visitor.
-- The iPhone check for this milestone is the user's: the water lantern at arm's length, the drift's pace, and the crickets' new level with the phone speaker.
+- The iPhone check for this milestone is the user's: the water lantern at arm's length, the drift's pace, and the bed with the phone speaker (wind and water only, now that the crickets are gone).
+
+**After the review (2026-09-18).** The crickets were removed completely: the cricket bus, the two chirping voices, the generated reverb tail (only the crickets used it), `CRICKET_LEVEL` and `cricketTrain` are gone from `src/audio`, with the unit test. The ambient bed is now wind and water lapping; 95 unit tests pass. SPEC section 7 and ROADMAP 1.5 were updated to match. Nothing else on the roadmap is being built.

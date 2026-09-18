@@ -12,8 +12,6 @@ export function dbToGain(db: number): number {
 export const MASTER_DB = -18;
 /** The master fades in over 2 s. */
 export const MASTER_FADE_S = 2;
-/** Cricket layer gain (the first per-layer mix control, ROADMAP 1.5): a little lower after the M6 review, about −3 dB. */
-export const CRICKET_LEVEL = 0.7;
 
 /** C major pentatonic, C5 D5 E5 G5 A5, in Hz. */
 export const CHIME_NOTES = [523.25, 587.33, 659.25, 783.99, 880.0] as const;
@@ -36,18 +34,6 @@ export const BELL_PARTIALS: readonly { ratio: number; level: number; decay: numb
 export function flameCurve(fill: number): { hz: number; gain: number } {
   const f = Math.max(0, Math.min(1, fill));
   return { hz: 260 + 1100 * f * f, gain: 0.55 * Math.pow(f, 1.4) };
-}
-
-/**
- * One cricket chirp train: pulse onsets in seconds from the train start.
- * `u` is a unit random that sets the pulse count (3–5) and the pace.
- */
-export function cricketTrain(u: number): number[] {
-  const pulses = 3 + Math.floor(u * 3);
-  const gap = 0.05 + (u % 0.1) * 0.15;
-  const out: number[] = [];
-  for (let i = 0; i < pulses; i++) out.push(i * gap);
-  return out;
 }
 
 /** Shimmer partials for a shooting star: a small falling cluster above 2 kHz. */

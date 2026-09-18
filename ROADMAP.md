@@ -14,7 +14,7 @@ The rules that stay: all art in code, nothing leaves the device, no accounts, no
 
 **1.4 Settings as an observable (S).** `applySettings()` pushes every setting to every consumer. A tiny observable store (`settings.on('sound', fn)`) lets the mute button, the sheet, the audio engine and the scene subscribe to what they need. Why: fewer "keep X in step with Y" bugs.
 
-**1.5 Audio graph as data (M).** The ambient bed and cues are built imperatively. A declarative patch (nodes, connections, envelopes) with a scheduler that looks ahead by a few seconds would replace the `setTimeout` chains, which drift when Safari throttles a background tab, and would make the soundscape tweakable without reading Web Audio code. A per-layer mixer (wind, crickets, water, cues) falls out of it.
+**1.5 Audio graph as data (M).** The ambient bed and cues are built imperatively. A declarative patch (nodes, connections, envelopes) with a scheduler that looks ahead by a few seconds would replace the `setTimeout` chains, which drift when Safari throttles a background tab, and would make the soundscape tweakable without reading Web Audio code. A per-layer mixer (wind, water, cues) falls out of it.
 
 **1.6 Versioned storage (S).** Add `schemaVersion` to the stored settings and the backup file, with a migration step on load. Why: any change to `Lantern` or `Settings` today silently drops or misreads old data; the backup format is the only way a sky moves between devices, so it must stay readable for years.
 

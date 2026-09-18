@@ -263,7 +263,7 @@ Keep one pixel grid everywhere; never mix pixel sizes. Make meaningful things re
 **Motion:** slow and soft (400–800 ms eases), no bouncy springs. One orchestrated moment per state. With reduced motion: cross-fades only, fewer particles, lanterns rise slower, no screen shake of any kind.
 
 **Sound (all generated with Web Audio, no files)**
-- Ambient bed: soft wind (filtered noise), sparse crickets, occasional water lapping.
+- Ambient bed: soft wind (filtered noise), occasional water lapping. (Crickets were tried in M4–M6 and removed after the M6 review.)
 - Lighting: a soft whoosh of flame that grows with the hold.
 - Release: a single bell-like chime from C major pentatonic (C5, D5, E5, G5, A5), random note.
 - Shooting star: a faint shimmer.

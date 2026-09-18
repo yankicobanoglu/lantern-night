@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BELL_PARTIALS, CHIME_NOTES, cricketTrain, dbToGain, flameCurve, MASTER_DB, pickChime, shimmerPartials } from '../../src/audio/cues';
+import { BELL_PARTIALS, CHIME_NOTES, dbToGain, flameCurve, MASTER_DB, pickChime, shimmerPartials } from '../../src/audio/cues';
 
 describe('sound helpers', () => {
   it('sets the master at about −18 dB', () => {
@@ -34,17 +34,6 @@ describe('sound helpers', () => {
     expect(flameCurve(1).hz).toBeGreaterThan(flameCurve(0).hz);
     expect(flameCurve(2).gain).toBeCloseTo(0.55, 5);
     expect(flameCurve(-1).gain).toBe(0);
-  });
-
-  it('cricket trains are short bursts of 3–5 pulses', () => {
-    for (const u of [0, 0.2, 0.5, 0.8, 0.999]) {
-      const t = cricketTrain(u);
-      expect(t.length).toBeGreaterThanOrEqual(3);
-      expect(t.length).toBeLessThanOrEqual(5);
-      expect(t[0]).toBe(0);
-      expect(t[t.length - 1]!).toBeLessThan(1);
-      for (let i = 1; i < t.length; i++) expect(t[i]!).toBeGreaterThan(t[i - 1]!);
-    }
   });
 
   it('shimmer partials sit above 2 kHz and start within a quarter second', () => {
