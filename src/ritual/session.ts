@@ -1,9 +1,11 @@
 import type { Renderer } from 'pixi.js';
-import { LIGHT_ARC_S, siteUrl, STAR_FIRST_SESSION_MAX_S, STAR_INTERVAL_MAX_S, STAR_INTERVAL_MIN_S, WATCH_BUTTONS_MIN_PROGRESS, WATCH_BUTTONS_SKY_FRACTION } from '../config';
+import { LIGHT_ARC_S, siteUrl, STAR_FIRST_SESSION_MAX_S, STAR_INTERVAL_MAX_S, STAR_INTERVAL_MIN_S } from '../config';
 import type { AudioEngine } from '../audio/engine';
 import type { Layout } from '../engine/layout';
 import { systemMotionLevel, type MotionLevel } from '../engine/motion';
 import { createRng } from '../engine/rng';
+import { fieldToArt, type SceneKind } from '../scene/field';
+import type { SceneHost } from '../scene/host';
 import type { Lantern as SceneLantern } from '../scene/lantern';
 import type { Scene } from '../scene/scene';
 import { pickStarPath, type StarAvoid } from '../scene/shootingStar';
@@ -31,11 +33,13 @@ import { COPY, defaultMode, type Mode } from './copy';
 import { HoldController } from './hold';
 import { Machine, type State } from './machine';
 import { moonAge, moonKind } from './moonPhase';
+import { meteorShower, starRate } from './nightEvents';
 
 export type SessionDeps = {
   root: HTMLElement;
   canvas: HTMLCanvasElement;
-  scene: Scene;
+  /** Owns the live scene; the Scene setting swaps it (ROADMAP 4.1). */
+  host: SceneHost;
   store: Store;
   audio: AudioEngine;
   renderer: Renderer;
@@ -52,6 +56,8 @@ export type SessionDeps = {
   /** The captured beforeinstallprompt event, if the browser offered one. */
   installPrompt: () => BeforeInstallPromptEvent | null;
   seed: number;
+  /** ?scene=sky|water pins the scene (tests); null follows the setting. */
+  sceneOverride: SceneKind | null;
 };
 
 /**
@@ -91,22 +97,31 @@ export class Session {
   private fieldFocusedAtDown = false;
   /** Session clock for the light arc, in scene time (speed applies). */
   private sessionMs = 0;
+  /** Shooting-star frequency factor tonight (ROADMAP 4.6): 1, or a meteor shower's rate. */
+  private starRate = 1;
+  /** The last interval the session scheduled (test hook). */
+  private lastStarInterval = NaN;
+
+  /** The live scene (it changes when the Scene setting does). */
+  private get scene(): Scene {
+    return this.deps.host.scene;
+  }
 
   constructor(private readonly deps: SessionDeps) {
-    const { root, scene, audio } = deps;
+    const { root, audio } = deps;
     this.rng = createRng(deps.seed ^ 0x5bd1e995);
     root.dataset['state'] = 'loading';
-    if (deps.evening !== null) scene.setEvening(deps.evening);
+    if (deps.evening !== null) this.scene.setEvening(deps.evening);
 
     this.hold = new HoldController(deps.canvas, {
       onFill: (fill, holding) => {
-        const l = scene.lanterns.resting;
+        const l = this.scene.lanterns.resting;
         if (l) l.fill = fill;
         this.lightUi.holding(holding);
         audio.setFlame(fill);
       },
       onLit: () => {
-        const l = scene.lanterns.resting;
+        const l = this.scene.lanterns.resting;
         if (l) {
           l.fill = 1;
           l.phase = 'lit';
@@ -155,10 +170,14 @@ export class Session {
       () => this.closeOverlays(),
       () => this.openShare(this.skyView.selectedWish),
       (id) => {
-        const rising = scene.lanterns.rising.find((r) => this.risingId(r) === id);
+        const rising = this.scene.lanterns.rising.find((r) => this.risingId(r) === id);
         if (!rising) return null;
         const L = deps.layout();
         return { x: rising.x * L.cssScale, y: rising.y * L.cssScale };
+      },
+      (p, L) => {
+        const a = fieldToArt(p, this.scene.field);
+        return { x: a.x * L.cssScale, y: a.y * L.cssScale };
       },
     );
     this.settings = new SettingsSheet(root, {
@@ -223,15 +242,57 @@ export class Session {
     return m === 'system' ? systemMotionLevel() : m;
   }
 
+  /** The scene to show: the test pin, else the setting. */
+  private sceneKind(): SceneKind {
+    return this.deps.sceneOverride ?? this.deps.store.settings.scene;
+  }
+
   private applySettings(): void {
     const s = this.deps.store.settings;
     document.documentElement.style.setProperty('--text-scale', String(s.textScale));
+    const kind = this.sceneKind();
+    if (kind !== this.deps.host.kind) this.switchScene(kind);
+    this.lightUi.setSceneKind(kind);
+    this.settings.setScene(kind);
     const m = this.motion();
-    this.deps.scene.setMotion(m);
+    this.scene.setMotion(m);
     this.lightUi.setMotion(m);
     this.deps.audio.setEnabled(s.sound);
     this.mute.set(s.sound);
     this.settings.setSound(s.sound);
+  }
+
+  /**
+   * The Scene setting changed (ROADMAP 4.1): swap the world, keep the night.
+   * Every light carries over. A lantern still waiting is placed again in the
+   * new scene with its words (hold again); lanterns on their way settle at
+   * once, and the watch buttons show if they had not yet.
+   */
+  private switchScene(kind: SceneKind): void {
+    const old = this.scene;
+    const waiting = old.lanterns.resting;
+    const words = waiting?.wishText ?? null;
+    for (const l of old.lanterns.rising) old.lanterns.settleNow(l);
+    const lights = old.skyLights.lights.map((l) => ({ ...l }));
+    const scene = this.deps.host.swap(kind, this.deps.layout(), this.motion(), lights);
+    this.released = null;
+    this.starUi.follow(null);
+    const state = this.machine.state;
+    if (state === 'light' && waiting) {
+      const l = scene.lanterns.spawnResting();
+      l.wishText = words;
+      this.lightUi.setWish(words);
+      this.hold.arm();
+      this.lightUi.idle();
+    } else if (state === 'release' || state === 'watch') {
+      if (!this.watchShown) {
+        this.watchShown = true;
+        this.lightUi.watch();
+      }
+      this.lightUi.settled();
+    }
+    this.followLantern();
+    if (this.skyView.isOpen) this.skyView.show(this.skyEntries(), this.deps.layout());
   }
 
   private async changeSettings(patch: Partial<Settings>): Promise<void> {
@@ -242,16 +303,33 @@ export class Session {
   // ---------- Start ----------
 
   async start(): Promise<void> {
-    const { store, scene } = this.deps;
+    const { store } = this.deps;
     await store.load();
-    for (const l of store.lanterns) scene.skyLights.add({ id: l.id, seed: l.seed, sky: l.sky, status: l.status });
     this.applySettings();
+    for (const l of store.lanterns) this.scene.skyLights.add({ id: l.id, seed: l.seed, sky: l.sky, status: l.status });
     this.machine.go('arrive');
     this.showArrive();
     if (!store.available) this.toast.show(COPY.system.storageUnavailable, 8000);
-    // Shooting stars: on a first-ever session one appears within the first 60 s.
+    // Shooting stars: on a first-ever session one appears within the first 60 s; a meteor shower raises the rate (ROADMAP 4.6).
+    this.starRate = starRate(this.deps.now());
     const first = store.settings.sessions === 0;
-    this.nextStarIn = this.deps.starNow ? 0.3 : first ? this.rng.range(12, STAR_FIRST_SESSION_MAX_S - 5) : this.rng.range(STAR_INTERVAL_MIN_S, STAR_INTERVAL_MAX_S);
+    this.nextStarIn = this.deps.starNow ? 0.3 : first ? this.rng.range(12, STAR_FIRST_SESSION_MAX_S - 5) : this.starInterval();
+  }
+
+  /** Seconds until the next shooting star: the section 7 interval, divided by tonight's shower rate. */
+  private starInterval(): number {
+    this.lastStarInterval = this.rng.range(STAR_INTERVAL_MIN_S, STAR_INTERVAL_MAX_S) / this.starRate;
+    return this.lastStarInterval;
+  }
+
+  /** Test hook: tonight's events. */
+  night(): { shower: string | null; rate: number; supermoon: boolean } {
+    return { shower: meteorShower(this.deps.now())?.name ?? null, rate: this.starRate, supermoon: this.scene.moon.isSupermoon };
+  }
+
+  /** Test hook: seconds until the next star is due, and the last interval the session scheduled. */
+  starIn(): { due: number; interval: number } {
+    return { due: this.nextStarIn, interval: this.lastStarInterval };
   }
 
   private moonNow(): ReturnType<typeof moonKind> {
@@ -287,11 +365,12 @@ export class Session {
 
   /** Every light in tonight's sky, settled or still rising, with its words when they were kept. */
   private skyEntries(): SkyEntry[] {
-    const { scene, store } = this.deps;
+    const { store } = this.deps;
+    const scene = this.scene;
     const byId = new Map(store.lanterns.map((l) => [l.id, l]));
-    const out: SkyEntry[] = scene.skyLights.lights.map((l, i) => {
+    const out: SkyEntry[] = scene.skyLights.lights.map((l) => {
       const rec = l.id ? byId.get(l.id) : undefined;
-      return { id: l.id ?? `night-${i}`, sky: l.sky, text: rec?.text ?? null, createdAt: rec?.createdAt ?? null, status: l.status };
+      return { id: l.id ?? `night-${l.seed}`, sky: l.sky, text: rec?.text ?? null, createdAt: rec?.createdAt ?? null, status: l.status };
     });
     for (const r of scene.lanterns.rising) {
       if (!r.sky) continue;
@@ -325,7 +404,7 @@ export class Session {
 
   private async answerReturn(l: Lantern, answer: ReturnAnswer): Promise<void> {
     const updated = await this.deps.store.answerReturn(l.id, answer, this.deps.now()).catch(() => undefined);
-    if (updated) this.deps.scene.skyLights.setStatus(updated.id, updated.status);
+    if (updated) this.scene.skyLights.setStatus(updated.id, updated.status);
   }
 
   // ---------- Light → release → watch ----------
@@ -334,7 +413,7 @@ export class Session {
     if (!this.machine.go('light')) return;
     this.mode = mode;
     this.intention.hide();
-    const l = this.deps.scene.lanterns.spawnResting();
+    const l = this.scene.lanterns.spawnResting();
     l.wishText = text;
     this.lightUi.setWish(text);
     this.followLantern();
@@ -343,7 +422,8 @@ export class Session {
   }
 
   private async release(): Promise<void> {
-    const { scene, store, audio } = this.deps;
+    const { store, audio } = this.deps;
+    const scene = this.scene;
     const l = scene.lanterns.resting;
     if (!l || !scene.lanterns.release(l) || !l.sky) return;
     this.machine.go('release');
@@ -381,10 +461,6 @@ export class Session {
     }
   }
 
-  /** The released lantern is well on its way: above the middle of the sky band, or already small. */
-  private farEnough(l: SceneLantern): boolean {
-    return l.phase !== 'rising' || l.y <= this.deps.layout().horizon * (1 - WATCH_BUTTONS_SKY_FRACTION) || l.rise.p >= WATCH_BUTTONS_MIN_PROGRESS;
-  }
 
   private lightAnother(): void {
     if (this.machine.state !== 'watch') return;
@@ -475,7 +551,8 @@ export class Session {
 
   /** Compose the share image for tonight's sky (SPEC section 9). */
   renderShare(wish: string | null): Promise<HTMLCanvasElement> {
-    const { scene, renderer } = this.deps;
+    const { renderer } = this.deps;
+    const scene = this.scene;
     return composeShareCanvas({
       renderer,
       seed: scene.seed,
@@ -484,11 +561,14 @@ export class Session {
       rising: scene.lanterns.rising.map((l) => l.rise.p),
       wish,
       evening: scene.evening,
+      kind: scene.kind,
+      supermoon: scene.moon.isSupermoon,
     });
   }
 
   private followLantern(): void {
-    const { scene, layout } = this.deps;
+    const { layout } = this.deps;
+    const scene = this.scene;
     const L = layout();
     const l = scene.lanterns.resting ?? (this.released && this.released.phase === 'rising' ? this.released : null);
     if (l) this.lightUi.follow(l.x * L.cssScale, l.y * L.cssScale, window.innerWidth);
@@ -516,22 +596,23 @@ export class Session {
     const before = new Set(this.deps.store.lanterns.map((l) => l.id));
     const added = await this.deps.store.merge(backup.lanterns).catch(() => 0);
     for (const l of this.deps.store.lanterns) {
-      if (!before.has(l.id)) this.deps.scene.skyLights.add({ id: l.id, seed: l.seed, sky: l.sky, status: l.status });
+      if (!before.has(l.id)) this.scene.skyLights.add({ id: l.id, seed: l.seed, sky: l.sky, status: l.status });
     }
     this.toast.show(`${COPY.settings.restored} ${COPY.settings.restoredCount(added)}`, 7000);
-    if (this.skyView.isOpen) this.skyView.show(this.deps.store.lanterns, this.deps.layout());
+    if (this.skyView.isOpen) this.skyView.show(this.skyEntries(), this.deps.layout());
   }
 
   private async clearSky(): Promise<void> {
     await this.deps.store.clear().catch(() => undefined);
-    this.deps.scene.skyLights.clear();
-    if (this.skyView.isOpen) this.skyView.show(this.deps.store.lanterns, this.deps.layout());
+    this.scene.skyLights.clear();
+    if (this.skyView.isOpen) this.skyView.show(this.skyEntries(), this.deps.layout());
   }
 
   // ---------- Shooting stars ----------
 
   private trySpawnStar(): void {
-    const { scene, layout, audio } = this.deps;
+    const { layout, audio } = this.deps;
+    const scene = this.scene;
     const L = layout();
     const css = L.cssScale;
     const avoid: StarAvoid[] = scene.lanterns.lanterns.filter((l) => l.phase !== 'done').map((l) => ({ x: l.x * css, y: l.y * css, r: 60 }));
@@ -542,7 +623,7 @@ export class Session {
     }
     scene.star.spawn(path);
     audio.shimmer();
-    this.nextStarIn = this.rng.range(STAR_INTERVAL_MIN_S, STAR_INTERVAL_MAX_S);
+    this.nextStarIn = this.starInterval();
   }
 
   /** Test hook: spawn a star now, ignoring the schedule. */
@@ -550,14 +631,14 @@ export class Session {
     const L = this.deps.layout();
     const path = pickStarPath(L, this.rng.int(1, 1 << 30), []);
     if (!path) return false;
-    this.deps.scene.star.spawn(path);
+    this.scene.star.spawn(path);
     this.deps.audio.shimmer();
     return true;
   }
 
   private tapStar(x: number, y: number): void {
-    if (!this.deps.scene.star.head()) return;
-    this.deps.scene.star.end();
+    if (!this.scene.star.head()) return;
+    this.scene.star.end();
     this.starUi.tapped(x, y);
   }
 
@@ -572,7 +653,7 @@ export class Session {
   // ---------- Per frame ----------
 
   update(dtMs: number): void {
-    const { scene } = this.deps;
+    const scene = this.scene;
     this.hold.update(dtMs);
     const state: State = this.machine.state;
     // Session light arc (SPEC section 3): from page open, over LIGHT_ARC_S; a stall never jumps it.
@@ -590,7 +671,7 @@ export class Session {
     this.starWasActive = starActive;
     this.starUi.follow(scene.star.head());
     if (this.skyView.isOpen && scene.lanterns.rising.length > 0) this.skyView.place(this.deps.layout());
-    if (state === 'watch' && this.released && !this.watchShown && this.farEnough(this.released)) {
+    if (state === 'watch' && this.released && !this.watchShown && scene.lanterns.wellOnItsWay(this.released)) {
       this.watchShown = true;
       this.lightUi.watch();
       this.maybeShowInstallHint();
@@ -611,7 +692,7 @@ export class Session {
 
   /** Test hook. */
   star(): { x: number; y: number } | null {
-    return this.deps.scene.star.head();
+    return this.scene.star.head();
   }
 
   /** Test hook: how many times the install hint has been shown. */

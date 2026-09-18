@@ -1,4 +1,4 @@
-import { cricketTrain } from './cues';
+import { CRICKET_LEVEL, cricketTrain } from './cues';
 
 /** A short, dark reverb tail from decaying noise, so the crickets sit in the field instead of in the phone. */
 export function reverbBuffer(ctx: BaseAudioContext, seconds = 0.9): AudioBuffer {
@@ -108,7 +108,7 @@ export class Ambient {
     // each side, each a lightly detuned pair of sines with a slow vibrato, rounded pulse envelopes,
     // a low-pass to take the edge off and a short generated reverb so they sit out in the field.
     const bus = ctx.createGain();
-    bus.gain.value = 1;
+    bus.gain.value = CRICKET_LEVEL;
     const soften = ctx.createBiquadFilter();
     soften.type = 'lowpass';
     soften.frequency.value = 5200;

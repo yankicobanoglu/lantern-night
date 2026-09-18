@@ -5,6 +5,9 @@ import { QUALITY_NAMES, type QualityGovernor, type QualityLevel } from './engine
 import type { FrameStats } from './engine/ticker';
 import type { Session } from './ritual/session';
 import { moonAge, moonFrame, type MoonFrame } from './ritual/moonPhase';
+import { isSupermoon } from './ritual/nightEvents';
+import type { SceneKind } from './scene/field';
+import type { SceneHost } from './scene/host';
 import type { Scene } from './scene/scene';
 import type { Store } from './store/store';
 import type { Lantern, Settings } from './store/types';
@@ -30,6 +33,10 @@ export type DebugOptions = {
   quality: QualityLevel | null;
   /** ?evening=0..1 pins the session light arc. */
   evening: number | null;
+  /** ?scene=sky|water pins the scene at boot (ROADMAP 4.1); null follows the setting. */
+  scene: SceneKind | null;
+  /** ?supermoon forces the larger moon (ROADMAP 4.6). */
+  supermoon: boolean;
 };
 
 export function readDebugOptions(search: string): DebugOptions {
@@ -43,6 +50,7 @@ export function readDebugOptions(search: string): DebugOptions {
   const motion = params.get('motion');
   const quality = params.get('quality');
   const evening = params.has('evening') ? Number(params.get('evening')) : NaN;
+  const scene = params.get('scene');
   return {
     now: fixed && !Number.isNaN(fixed.getTime()) ? () => fixed : () => new Date(),
     forcedFrame: forced,
@@ -55,7 +63,14 @@ export function readDebugOptions(search: string): DebugOptions {
     installForce: params.get('install') === 'ios' ? 'ios' : params.get('install') === 'prompt' ? 'prompt' : null,
     quality: quality !== null && /^[123]$/.test(quality) ? (Number(quality) as QualityLevel) : null,
     evening: Number.isNaN(evening) ? null : Math.max(0, Math.min(1, evening)),
+    scene: scene === 'sky' || scene === 'water' ? scene : null,
+    supermoon: params.has('supermoon'),
   };
+}
+
+/** Tonight's moon is a supermoon (from the date), or the hook forces it. */
+export function supermoonForNow(opts: DebugOptions): boolean {
+  return opts.supermoon || isSupermoon(opts.now());
 }
 
 export function frameForNow(opts: DebugOptions): MoonFrame {
@@ -109,8 +124,13 @@ export type LanternDebug = {
   setQuality: (level: QualityLevel) => void;
   /** Session light arc position 0–1. */
   evening: () => number;
+  /** Real-night events (ROADMAP 4.6): the shower tonight, its star-rate factor, and whether the moon is drawn large. */
+  night: () => { shower: string | null; rate: number; supermoon: boolean; moonSize: number };
+  /** The scene in use and the seconds until the next shooting star is due. */
+  sceneKind: () => SceneKind;
+  starIn: () => { due: number; interval: number };
   /** The live scene, for manual inspection in dev. */
-  scene: Scene;
+  readonly scene: Scene;
   ready: boolean;
 };
 
@@ -122,7 +142,7 @@ declare global {
 
 export function installDebug(
   app: Application,
-  scene: Scene,
+  host: SceneHost,
   session: Session,
   store: Store,
   audio: AudioEngine,
@@ -136,6 +156,7 @@ export function installDebug(
     if ((p[i + 3] ?? 0) === 0) return -1;
     return ((p[i] ?? 0) << 16) | ((p[i + 1] ?? 0) << 8) | (p[i + 2] ?? 0);
   };
+  const scene = (): Scene => host.scene;
   window.__lantern = {
     get layout() {
       return getLayout();
@@ -152,24 +173,24 @@ export function installDebug(
       stats.reset();
       cpu.reset();
     },
-    moonFrame: () => scene.moon.currentFrame,
+    moonFrame: () => scene().moon.currentFrame,
     samplePixel: (x, y) => {
-      const out = app.renderer.extract.pixels(scene.pipeline.worldRT);
+      const out = app.renderer.extract.pixels(scene().pipeline.worldRT);
       return readPixel(out.pixels, out.width, x, y);
     },
     sampleRect: (x, y, w, h) => {
-      const out = app.renderer.extract.pixels(scene.pipeline.worldRT);
+      const out = app.renderer.extract.pixels(scene().pipeline.worldRT);
       const result: number[] = [];
       for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) result.push(readPixel(out.pixels, out.width, xx, yy));
       return result;
     },
-    lanterns: () => scene.lanterns.lanterns.map((l) => ({ phase: l.phase, fill: l.fill, x: l.x, y: l.y, p: l.rise.p })),
-    skyLights: () => scene.skyLights.lights.length,
+    lanterns: () => scene().lanterns.lanterns.map((l) => ({ phase: l.phase, fill: l.fill, x: l.x, y: l.y, p: l.rise.p })),
+    skyLights: () => scene().skyLights.lights.length,
     hold: () => ({ state: session.hold.state, fill: session.hold.fill }),
     light: () => session.hold.lightNow(),
     release: () => session.hold.releaseNow(),
     speed: (x) => {
-      scene.speed = x;
+      scene().speed = x;
     },
     state: () => session.machine.state,
     store: {
@@ -184,20 +205,25 @@ export function installDebug(
     shareImage: async (wish = null) => (await session.renderShare(wish)).toDataURL('image/png'),
     install: () => ({ path: session.installPath(), hintCount: session.installHintCount() }),
     quality: () => ({
-      level: scene.quality,
-      name: QUALITY_NAMES[scene.quality],
-      skyHalos: scene.skyLights.halos.visible,
-      fireflies: scene.fireflies.report(),
-      cozy: scene.cozy.report(),
-      moonHalo: scene.moon.halo.visible,
-      lanternBloom: scene.lanterns.lanterns.map((l) => l.bloom),
+      level: scene().quality,
+      name: QUALITY_NAMES[scene().quality],
+      skyHalos: scene().skyLights.halos.visible,
+      fireflies: scene().fireflies.report(),
+      cozy: scene().cozy.report(),
+      moonHalo: scene().moon.halo.visible,
+      lanternBloom: scene().lanterns.lanterns.map((l) => l.bloom),
     }),
     setQuality: (level) => {
       governor.set(level);
-      scene.setQuality(level);
+      scene().setQuality(level);
     },
-    evening: () => scene.evening,
-    scene,
+    evening: () => scene().evening,
+    night: () => ({ ...session.night(), moonSize: scene().moon.size }),
+    sceneKind: () => host.kind,
+    starIn: () => session.starIn(),
+    get scene() {
+      return scene();
+    },
     ready: false,
   };
 }

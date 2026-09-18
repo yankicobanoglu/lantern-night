@@ -6,9 +6,8 @@ import { hash01 } from '../engine/rng';
 import type { Wind } from '../engine/wind';
 import { PALETTE } from '../palette';
 import { sizeStage, stepRise, type RiseOptions, type RiseState } from './lanternPhysics';
-import type { LanternTextures } from './lanternTextures';
+import type { LanternSpriteSet, StageName } from './lanternTextures';
 import type { SkyPoint } from './skyPoint';
-import { DOT, LANTERN_H, LANTERN_W, LARGE_H, LARGE_W, SMALL_H, SMALL_W } from './sprites/lantern';
 
 export type LanternPhase = 'unlit' | 'lit' | 'rising' | 'done';
 
@@ -26,6 +25,8 @@ const HALO_TEX = 256;
 /**
  * One lantern: pixel sprites in two pixel layers (see PLAN-M2 "Where lanterns
  * are drawn") and three light-layer sprites (halo, core bloom, water streak).
+ * The sprite set decides what it looks like (sky lantern or water lantern);
+ * the field decides where it rests and where it goes.
  */
 export class Lantern {
   phase: LanternPhase = 'unlit';
@@ -50,16 +51,19 @@ export class Lantern {
   private readonly halo: Sprite;
   private readonly core: Sprite;
   private readonly streak: Sprite;
-  private stage: 'large' | 'big' | 'small' | 'dot' = 'large';
+  private stage: StageName = 'large';
+  private rest: { x: number; y: number };
 
   constructor(
     readonly seed: number,
     private layout: Layout,
-    private readonly tex: LanternTextures,
+    private readonly set: LanternSpriteSet,
     layers: LanternLayers,
+    rest: { x: number; y: number },
   ) {
-    this.x = layout.lanternRest.x;
-    this.y = layout.lanternRest.y;
+    this.rest = rest;
+    this.x = rest.x;
+    this.y = rest.y;
     this.swayPhase = hash01(seed, 3) * Math.PI * 2;
     this.rise = { xFree: this.x, vx: 0, y: this.y, startY: this.y, target: { x: this.x, y: 0 }, p: 0, swayPhase: this.swayPhase };
 
@@ -79,7 +83,7 @@ export class Lantern {
     this.place(0);
   }
 
-  /** Start the rise toward a sky point (art px target computed by the field). */
+  /** Start the journey toward a field point (art px target computed by the field). */
   release(target: { x: number; y: number }, sky: SkyPoint): void {
     this.phase = 'rising';
     this.fill = 1;
@@ -92,26 +96,27 @@ export class Lantern {
     this.rise.p = 0;
   }
 
-  /** Called on resize: keep normalised sky target, re-anchor a resting lantern. */
-  resize(layout: Layout, target: { x: number; y: number } | null): void {
+  /** Called on resize: keep the normalised target, re-anchor a resting lantern. */
+  resize(layout: Layout, target: { x: number; y: number } | null, rest: { x: number; y: number }): void {
     const oldW = Math.max(1, this.layout.width);
     this.layout = layout;
+    this.rest = rest;
     if (this.phase === 'unlit' || this.phase === 'lit') {
-      this.x = layout.lanternRest.x;
-      this.y = layout.lanternRest.y;
+      this.x = rest.x;
+      this.y = rest.y;
     } else if (target) {
       // Rescale the free position proportionally and keep the target.
       this.rise.xFree = (this.rise.xFree / oldW) * layout.width;
       this.rise.target = target;
       const span = Math.max(1, this.rise.startY - this.rise.target.y);
-      this.rise.startY = layout.lanternRest.y;
+      this.rise.startY = rest.y;
       this.rise.y = this.rise.startY - this.rise.p * span;
     }
   }
 
   /**
-   * Advance by dt seconds. Returns true once the lantern has settled at its sky
-   * point and should hand off to the sky layer.
+   * Advance by dt seconds. Returns true once the lantern has settled at its
+   * field point and should hand off to the lights layer.
    */
   update(dt: number, tSec: number, wind: Wind, riseOpts: RiseOptions, swayAmp: number): boolean {
     // Flicker at roughly 8 Hz, seeded so lanterns don't blink in unison.
@@ -128,8 +133,8 @@ export class Lantern {
       this.y = this.rise.y;
       handOff = r.done;
     } else {
-      // Resting over the dock: the same sway formula as the rise, so release doesn't pop.
-      const rest = this.layout.lanternRest;
+      // Resting: the same sway formula as the journey, so release doesn't pop.
+      const rest = this.rest;
       const sway = swayAmp * Math.sin(tSec * 0.8 + this.swayPhase) + swayAmp * 0.4 * Math.sin(tSec * 1.7 + this.swayPhase * 2);
       this.x = rest.x + sway;
       this.y = rest.y + 0.6 * Math.sin(tSec * 0.5 + this.swayPhase);
@@ -141,7 +146,7 @@ export class Lantern {
     } else if (stage === 'big' || stage === 'large') {
       this.applyTextures();
     } else {
-      const t = stage === 'small' ? this.tex.small[this.frame % 2]! : this.tex.dot[this.frame % 2]!;
+      const t = stage === 'small' ? this.set.small[this.frame % 2]! : this.set.dot[this.frame % 2]!;
       this.aboveSprite.texture = t;
       this.nearSprite.texture = t;
     }
@@ -153,28 +158,19 @@ export class Lantern {
   private applyTextures(): void {
     const t =
       this.stage === 'large'
-        ? this.tex.largeFor(this.frame, this.fill)
+        ? this.set.largeFor(this.frame, this.fill)
         : this.stage === 'big'
-          ? this.tex.bigFor(this.frame, this.fill)
+          ? this.set.bigFor(this.frame, this.fill)
           : this.stage === 'small'
-            ? this.tex.small[this.frame % 2]!
-            : this.tex.dot[this.frame % 2]!;
+            ? this.set.small[this.frame % 2]!
+            : this.set.dot[this.frame % 2]!;
     this.aboveSprite.texture = t;
     this.nearSprite.texture = t;
   }
 
-  private spriteSize(): { w: number; h: number } {
-    return this.stage === 'large'
-      ? { w: LARGE_W, h: LARGE_H }
-      : this.stage === 'big'
-        ? { w: LANTERN_W, h: LANTERN_H }
-        : this.stage === 'small'
-          ? { w: SMALL_W, h: SMALL_H }
-          : { w: DOT, h: DOT };
-  }
-
   private place(tSec: number): void {
-    const { w, h } = this.spriteSize();
+    const { w, h } = this.set.sizes[this.stage];
+    const restW = this.set.sizes.large.w;
     const px = Math.round(this.x - w / 2);
     const py = Math.round(this.y - h / 2);
     this.aboveSprite.position.set(px, py);
@@ -190,9 +186,9 @@ export class Lantern {
     const cx = this.x * css;
     const cy = this.y * css;
 
-    // Halo: about 4 lantern widths on the shore, shrinking to a sky-light halo of ~14 art px.
+    // Halo: about 3.4 lantern widths at rest, shrinking to a sky-light halo of ~14 art px.
     const bloom = this.quality >= 2;
-    const haloD = (LARGE_W * 3.4 * (1 - p) + 14 * p) * css;
+    const haloD = (restW * 3.4 * (1 - p) + 14 * p) * css;
     this.halo.position.set(cx, cy);
     this.halo.width = haloD;
     this.halo.height = haloD;
@@ -201,7 +197,7 @@ export class Lantern {
     this.streak.visible = bloom;
 
     const coreD = (w * 1.6 + 2) * css;
-    this.core.position.set(cx, cy + (this.stage === 'large' ? 6 * css : this.stage === 'big' ? 4 * css : 0));
+    this.core.position.set(cx, cy + this.set.coreDy[this.stage] * css);
     this.core.width = coreD;
     this.core.height = coreD;
     this.core.alpha = 0.5 * lit * flicker;
@@ -214,8 +210,8 @@ export class Lantern {
     const overWater = Math.max(0, Math.min(1, (L.lakeEnd - bottom) / 12));
     const wobble = Math.sin(tSec * 1.3 + this.swayPhase) * 1.2 * css;
     this.streak.position.set(cx + wobble, Math.min(waterY, L.lakeEnd - 1) * css);
-    this.streak.width = LARGE_W * 1.8 * css * (1 - 0.5 * p);
-    this.streak.height = LARGE_W * 3.4 * css * (1 - 0.6 * p);
+    this.streak.width = restW * 1.8 * css * (1 - 0.5 * p);
+    this.streak.height = restW * 3.4 * css * (1 - 0.6 * p);
     this.streak.alpha = 0.4 * lit * overWater * Math.pow(1 - p, 1.5) * flicker;
   }
 

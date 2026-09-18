@@ -1,19 +1,23 @@
 import { Container } from 'pixi.js';
-import { MAX_ACTIVE, REDUCED_MOTION_RISE_FACTOR, RISE_SPEED } from '../config';
+import { MAX_ACTIVE, REDUCED_MOTION_RISE_FACTOR, RISE_SPEED, WATCH_BUTTONS_MIN_PROGRESS, WATCH_BUTTONS_SKY_FRACTION, WATER_DRIFT_SPEED } from '../config';
 import type { Layout } from '../engine/layout';
 import type { MotionLevel } from '../engine/motion';
 import type { QualityLevel } from '../engine/quality';
-import { WindField } from '../engine/wind';
+import { WindField, type Wind } from '../engine/wind';
+import { fieldFor, fieldToArt, pickFieldPoint, type Field, type SceneKind } from './field';
 import { Lantern, type LanternLayers } from './lantern';
 import type { RiseOptions } from './lanternPhysics';
-import { LanternTextures } from './lanternTextures';
-import { pickSkyPoint, skyToArt, type SkyBounds, type SkyPoint } from './skyPoint';
+import { lanternSpriteSet, type LanternSpriteSet } from './lanternTextures';
+import type { SkyPoint } from './skyPoint';
 
 export type HandOff = { seed: number; sky: SkyPoint; id: string | null };
 
 /**
- * Manages the active lanterns: at most one waiting over the dock, up to
- * MAX_ACTIVE rising. Hands settled lanterns to the sky layer via onHandOff.
+ * Manages the active lanterns: at most one waiting at the rest point, up to
+ * MAX_ACTIVE on their way. Hands settled lanterns to the lights layer via
+ * onHandOff. The scene kind chooses the sprite set, the rest point, the field
+ * the lanterns settle in and how they move (rising on the wind, or drifting
+ * out across the lake).
  */
 export class LanternField {
   readonly aboveLayer = new Container();
@@ -21,18 +25,25 @@ export class LanternField {
   readonly lightLayer = new Container();
   readonly lanterns: Lantern[] = [];
   readonly wind: WindField;
+  readonly set: LanternSpriteSet;
+  field: Field;
   onHandOff: ((h: HandOff) => void) | null = null;
-  /** Existing sky lights, so new sky points spread out. Set by the scene. */
+  /** Existing lights, so new field points spread out. Set by the scene. */
   existingSky: () => readonly SkyPoint[] = () => [];
   motion: MotionLevel = 'full';
   quality: QualityLevel = 3;
-  readonly tex = new LanternTextures();
   private nextSeed: number;
 
-  constructor(private layout: Layout, seed: number) {
+  constructor(
+    private layout: Layout,
+    seed: number,
+    readonly kind: SceneKind = 'sky',
+  ) {
     this.wind = new WindField(seed, 4);
     this.nextSeed = (seed * 7919 + 17) >>> 0;
     this.lightLayer.blendMode = 'add';
+    this.set = lanternSpriteSet(kind);
+    this.field = fieldFor(kind, layout);
   }
 
   setQuality(level: QualityLevel): void {
@@ -44,11 +55,12 @@ export class LanternField {
     return { above: this.aboveLayer, near: this.nearLayer, light: this.lightLayer };
   }
 
-  private bounds(): SkyBounds {
-    return { width: this.layout.width, horizon: this.layout.horizon, moon: this.layout.moon };
+  /** Where an unlit lantern waits, in art px. */
+  restPoint(): { x: number; y: number } {
+    return this.kind === 'water' ? this.layout.waterRest : this.layout.lanternRest;
   }
 
-  /** The lantern waiting over the dock, if any. */
+  /** The lantern waiting at the rest point, if any. */
   get resting(): Lantern | null {
     return this.lanterns.find((l) => l.phase === 'unlit' || l.phase === 'lit') ?? null;
   }
@@ -62,11 +74,11 @@ export class LanternField {
     return this.nextSeed;
   }
 
-  /** Place a new unlit lantern over the dock (no-op if one is already there). */
+  /** Place a new unlit lantern at the rest point (no-op if one is already there). */
   spawnResting(): Lantern {
     const existing = this.resting;
     if (existing) return existing;
-    const l = new Lantern(this.takeSeed(), this.layout, this.tex, this.layers);
+    const l = new Lantern(this.takeSeed(), this.layout, this.set, this.layers, this.restPoint());
     l.quality = this.quality;
     this.lanterns.push(l);
     return l;
@@ -76,15 +88,15 @@ export class LanternField {
   release(l: Lantern): boolean {
     if (l.phase !== 'lit') return false;
     if (this.rising.length >= MAX_ACTIVE) this.handOff(this.rising[0]!);
-    const sky = pickSkyPoint(l.seed, this.bounds(), [...this.existingSky(), ...this.lanterns.flatMap((o) => (o.sky ? [o.sky] : []))]);
-    l.release(skyToArt(sky, this.bounds()), sky);
+    const sky = pickFieldPoint(l.seed, this.field, [...this.existingSky(), ...this.lanterns.flatMap((o) => (o.sky ? [o.sky] : []))]);
+    l.release(fieldToArt(sky, this.field), sky);
     return true;
   }
 
-  /** Test hook: a lit lantern already part-way up. */
+  /** Test hook: a lit lantern already part-way along. */
   spawnRising(progress: number): Lantern {
     if (this.rising.length >= MAX_ACTIVE) this.handOff(this.rising[0]!);
-    const l = new Lantern(this.takeSeed(), this.layout, this.tex, this.layers);
+    const l = new Lantern(this.takeSeed(), this.layout, this.set, this.layers, this.restPoint());
     l.quality = this.quality;
     l.fill = 1;
     l.phase = 'lit';
@@ -97,6 +109,22 @@ export class LanternField {
     return l;
   }
 
+  /**
+   * The released lantern is well on its way (the watch buttons may fade in):
+   * in the sky, above the middle of the sky band or already small; on the
+   * water, past the middle of its drift.
+   */
+  wellOnItsWay(l: Lantern): boolean {
+    if (l.phase !== 'rising') return true;
+    if (this.kind === 'water') return l.rise.p >= 0.5;
+    return l.y <= this.layout.horizon * (1 - WATCH_BUTTONS_SKY_FRACTION) || l.rise.p >= WATCH_BUTTONS_MIN_PROGRESS;
+  }
+
+  /** Settle a lantern on its way right now (scene change): its light is handed off at once. */
+  settleNow(l: Lantern): void {
+    if (l.phase === 'rising') this.handOff(l);
+  }
+
   private handOff(l: Lantern): void {
     if (l.sky) this.onHandOff?.({ seed: l.seed, sky: l.sky, id: l.storedId });
     l.destroy();
@@ -106,6 +134,14 @@ export class LanternField {
 
   private riseOptions(): RiseOptions {
     const gentle = this.motion === 'gentle';
+    if (this.kind === 'water') {
+      return {
+        riseSpeed: gentle ? WATER_DRIFT_SPEED / REDUCED_MOTION_RISE_FACTOR : WATER_DRIFT_SPEED,
+        swayAmp: gentle ? 0.25 : 0.5,
+        minX: 6,
+        maxX: this.layout.width - 6,
+      };
+    }
     return {
       riseSpeed: gentle ? RISE_SPEED / REDUCED_MOTION_RISE_FACTOR : RISE_SPEED,
       swayAmp: gentle ? 0.6 : 1.2,
@@ -118,7 +154,9 @@ export class LanternField {
     const opts = this.riseOptions();
     const settled: Lantern[] = [];
     for (const l of this.lanterns) {
-      const wind = this.wind.sample(l.x, l.y, tSec);
+      const raw = this.wind.sample(l.x, l.y, tSec);
+      // On the water the wind pushes sideways but barely against the drift.
+      const wind: Wind = this.kind === 'water' ? { x: raw.x * 0.6, y: raw.y * 0.15 } : raw;
       if (l.update(dt, tSec, wind, opts, opts.swayAmp)) settled.push(l);
     }
     for (const l of settled) this.handOff(l);
@@ -126,6 +164,8 @@ export class LanternField {
 
   resize(layout: Layout): void {
     this.layout = layout;
-    for (const l of this.lanterns) l.resize(layout, l.sky ? skyToArt(l.sky, this.bounds()) : null);
+    this.field = fieldFor(this.kind, layout);
+    const rest = this.restPoint();
+    for (const l of this.lanterns) l.resize(layout, l.sky ? fieldToArt(l.sky, this.field) : null, rest);
   }
 }

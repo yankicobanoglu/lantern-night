@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { litWidthAtEquator, moonPixelMap, MOON_SIZE } from '../../src/scene/sprites/moon';
+import { litWidthAtEquator, moonPixelMap, MOON_SIZE, SUPERMOON_SIZE } from '../../src/scene/sprites/moon';
 import type { MoonFrame } from '../../src/ritual/moonPhase';
 
 const frames = [0, 1, 2, 3, 4, 5, 6, 7] as MoonFrame[];
@@ -45,5 +45,19 @@ describe('moon sprite frames', () => {
   it('thinnest crescents are at least 4 art px wide', () => {
     expect(litWidthAtEquator(1)).toBeGreaterThanOrEqual(4);
     expect(litWidthAtEquator(7)).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('supermoon disc (ROADMAP 4.6)', () => {
+  it('is a 36 px disc with the same rules: full disc every frame, crescents at least 4 px, still on the grid', () => {
+    const discs = frames.map((f) => count(moonPixelMap(f, SUPERMOON_SIZE), 'm') + count(moonPixelMap(f, SUPERMOON_SIZE), 'e'));
+    for (const d of discs) expect(d).toBe(discs[0]);
+    expect(discs[0]).toBeGreaterThan(count(moonPixelMap(4), 'm'));
+    expect(moonPixelMap(0, SUPERMOON_SIZE).length).toBe(SUPERMOON_SIZE);
+    for (const row of moonPixelMap(3, SUPERMOON_SIZE)) expect(row.length).toBe(SUPERMOON_SIZE);
+    expect(count(moonPixelMap(0, SUPERMOON_SIZE), 'm')).toBe(0);
+    expect(count(moonPixelMap(4, SUPERMOON_SIZE), 'e')).toBe(0);
+    expect(litWidthAtEquator(1, SUPERMOON_SIZE)).toBeGreaterThanOrEqual(4);
+    expect(litWidthAtEquator(7, SUPERMOON_SIZE)).toBeGreaterThanOrEqual(4);
   });
 });

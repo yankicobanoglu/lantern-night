@@ -1,6 +1,6 @@
 # Lantern Night — roadmap
 
-Where the project could go after v1. Nothing here is built; each item is a proposal with a rough size (S: an evening, M: a milestone, L: several) and a note on why it matters. Order inside each section is a suggested priority.
+Where the project could go after v1. Each item is a proposal with a rough size (S: an evening, M: a milestone, L: several) and a note on why it matters. Order inside each section is a suggested priority. Sections 1–3 were reviewed item by item in `PLAN-M6.md` (Part 1); the verdicts there say which items to do as written, which to reshape, and which to skip. Items marked **built** are done.
 
 The rules that stay: all art in code, nothing leaves the device, no accounts, no ads, the copy deck governs wording, and the performance budgets in SPEC.md section 8 hold.
 
@@ -56,7 +56,7 @@ Measured on an M4 Mac every level holds 60 fps, so these are for the phone, in t
 
 ## 4. New features
 
-**4.1 Extra scenes (L; section 14).** Water lanterns on the lake, a dandelion in a field, a wishing well: each a new `Scene` for the same ritual, chosen in Settings, sharing the copy, storage and audio. This is the biggest reason for 1.3.
+**4.1 Extra scenes (L; section 14). Partly built (M6):** the seam (a scene kind, a field for where lights settle, a scene host that swaps the world live), the Scene setting, and the first extra scene, water lanterns on the lake. Remaining: a dandelion in a field and a wishing well, each a new world for the same ritual (M each). See PLAN-M6 for why the seam is session↔scene rather than 1.3's scene↔subsystem.
 
 **4.2 Localisation (M).** The copy deck as data (1.7) plus a language setting; Turkish first, given the audience. Dates and the moon label already use the browser locale.
 
@@ -66,7 +66,7 @@ Measured on an M4 Mac every level holds 60 fps, so these are for the phone, in t
 
 **4.5 Return reminders without a server (S).** No push (it needs a server), but an "Add to calendar" for the return date, and the home-screen badge where the Badging API exists.
 
-**4.6 Real-night events (S).** Meteor showers on their actual dates (Perseids in August, Geminids in December) raise the shooting-star rate for the night; a supermoon is drawn a little larger. All computed locally from the date.
+**4.6 Real-night events (S). Built (M6):** the eight annual showers raise the shooting-star rate on their nights; a supermoon is drawn as a 36 px disc. All computed locally from the date. Open: a line of copy for shower and supermoon nights (proposed in PLAN-M6).
 
 **4.7 Shortcuts and links (S).** `?mode=let-go` and `?mode=wish` open straight into the intention screen so iOS Shortcuts and home-screen bookmarks can start a specific ritual.
 

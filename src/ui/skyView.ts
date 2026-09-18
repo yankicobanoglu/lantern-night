@@ -1,11 +1,12 @@
 import type { Layout } from '../engine/layout';
 import { COPY } from '../ritual/copy';
+import type { SkyPoint } from '../scene/skyPoint';
 import type { SkyStatus } from '../scene/sprites/lantern';
 import { button, el, formatDate } from './dom';
+import { focusFirst } from './focus';
 
 /** One light in tonight's sky: a stored wish (text and date) or a session-only light with no words kept. */
-export type SkyEntry = { id: string; sky: { x: number; y: number }; text: string | null; createdAt: string | null; status: SkyStatus };
-import { focusFirst } from './focus';
+export type SkyEntry = { id: string; sky: SkyPoint; text: string | null; createdAt: string | null; status: SkyStatus };
 
 /**
  * Your sky (SPEC section 4): heading, count, and one real button over every
@@ -31,6 +32,8 @@ export class SkyView {
     onShare: () => void,
     /** CSS-px position of a lantern still on its way to this stored light, or null once it has arrived. */
     private readonly track: (id: string) => { x: number; y: number } | null = () => null,
+    /** A stored point in CSS px, through the current scene's field (the sky band, or the lake). */
+    private readonly project: (p: SkyPoint, layout: Layout) => { x: number; y: number } = (p, layout) => ({ x: p.x * layout.width * layout.cssScale, y: p.y * layout.horizon * layout.cssScale }),
   ) {
     this.count = el('p', { class: 'line hand' });
     this.lights = el('div', { class: 'lights' });
@@ -80,16 +83,15 @@ export class SkyView {
 
   place(layout: Layout): void {
     this.layout = layout;
-    const css = layout.cssScale;
     const buttons = this.lights.children;
     for (let i = 0; i < buttons.length; i++) {
       const b = buttons[i] as HTMLElement;
       const l = this.lanterns[i];
       if (!l) continue;
-      // A lantern still rising keeps its ring with it until it settles at its sky point.
-      const live = this.track(l.id);
-      b.style.left = `${live ? live.x : l.sky.x * layout.width * css}px`;
-      b.style.top = `${live ? live.y : l.sky.y * layout.horizon * css}px`;
+      // A lantern still on its way keeps its ring with it until it settles at its point.
+      const at = this.track(l.id) ?? this.project(l.sky, layout);
+      b.style.left = `${at.x}px`;
+      b.style.top = `${at.y}px`;
     }
   }
 

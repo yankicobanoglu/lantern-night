@@ -75,3 +75,6 @@ export const STAR_HEAD_PX = 9;
 export const STAR_TRAIL_PX = 80;
 export const STAR_HIT_PX = 64;
 export const STAR_CROSS_FRACTION = 0.4;
+
+/** Water scene (ROADMAP 4.1): the lantern drifts out across the lake at this many art px per second. */
+export const WATER_DRIFT_SPEED = 3.6;

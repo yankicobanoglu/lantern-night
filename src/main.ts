@@ -2,15 +2,15 @@ import { UPDATE_PRIORITY } from 'pixi.js';
 import { registerSW } from 'virtual:pwa-register';
 import './styles.css';
 import { AudioEngine } from './audio/engine';
-import { frameForNow, installDebug, mountFpsOverlay, readDebugOptions } from './debug';
+import { frameForNow, installDebug, mountFpsOverlay, readDebugOptions, supermoonForNow } from './debug';
 import { createApp } from './engine/app';
 import { computeLayout } from './engine/layout';
 import { systemMotionLevel, type MotionLevel } from './engine/motion';
 import { QualityGovernor } from './engine/quality';
 import { FrameStats } from './engine/ticker';
 import { Session } from './ritual/session';
-import { Scene } from './scene/scene';
-import { pickSkyPoint } from './scene/skyPoint';
+import { pickFieldPoint } from './scene/field';
+import { SceneHost } from './scene/host';
 import { openKv } from './store/kv';
 import { Store } from './store/store';
 import { captureInstallPrompt } from './ui/install';
@@ -33,26 +33,27 @@ async function boot(): Promise<void> {
   const cpu = new FrameStats();
 
   let layout = computeLayout(window.innerWidth, window.innerHeight, app.renderer.resolution);
-  const scene = new Scene(app.renderer, app.stage, layout, opts.seed, motion());
-  scene.setMoonFrame(frameForNow(opts));
+  // The scene host owns the live scene; the Scene setting swaps it once the store has loaded (ROADMAP 4.1).
+  const host = new SceneHost(app.renderer, app.stage, layout, opts.seed, motion(), opts.scene ?? 'sky');
+  host.scene.setMoonFrame(frameForNow(opts));
+  host.scene.moon.setSupermoon(supermoonForNow(opts));
   // Adaptive quality (SPEC section 8): starts full, steps down when frames run long; ?quality= pins it.
   const governor = new QualityGovernor(opts.quality);
-  scene.setQuality(governor.level);
+  host.scene.setQuality(governor.level);
 
   // Test hooks: pre-seeded sky and lanterns already rising.
   for (let i = 0; i < opts.skyLights; i++) {
     const seed = (opts.seed * 1000 + i * 7919) >>> 0;
-    const bounds = { width: layout.width, horizon: layout.horizon, moon: layout.moon };
-    scene.skyLights.add({ seed, sky: pickSkyPoint(seed, bounds, scene.skyLights.points), status: 'rising' });
+    host.scene.skyLights.add({ seed, sky: pickFieldPoint(seed, host.scene.field, host.scene.skyLights.points), status: 'rising' });
   }
-  for (let i = 0; i < opts.risingLanterns; i++) scene.lanterns.spawnRising((i + 0.5) / (opts.risingLanterns + 1) * 0.8);
+  for (let i = 0; i < opts.risingLanterns; i++) host.scene.lanterns.spawnRising((i + 0.5) / (opts.risingLanterns + 1) * 0.8);
 
   const store = new Store(await openKv());
   const audio = new AudioEngine();
   const session = new Session({
     root: uiRoot,
     canvas,
-    scene,
+    host,
     store,
     audio,
     renderer: app.renderer,
@@ -64,9 +65,10 @@ async function boot(): Promise<void> {
     installPrompt: installPrompt.get,
     seed: opts.seed,
     evening: opts.evening,
+    sceneOverride: opts.scene,
   });
 
-  installDebug(app, scene, session, store, audio, stats, cpu, governor, () => layout);
+  installDebug(app, host, session, store, audio, stats, cpu, governor, () => layout);
   if (opts.showFps) mountFpsOverlay(stats, cpu, governor);
 
   let resizeTimer = 0;
@@ -79,8 +81,8 @@ async function boot(): Promise<void> {
       appliedH = window.innerHeight;
       app.renderer.resize(window.innerWidth, window.innerHeight);
       layout = computeLayout(window.innerWidth, window.innerHeight, app.renderer.resolution);
-      scene.resize(layout, session.motion());
-      scene.setMoonFrame(frameForNow(opts));
+      host.scene.resize(layout, session.motion());
+      host.scene.setMoonFrame(frameForNow(opts));
       session.resize(layout);
       governor.reset();
     }, 80);
@@ -108,9 +110,9 @@ async function boot(): Promise<void> {
       // A home-screen web app on iOS can report the wrong height at launch without a resize event: check every frame.
       if (window.innerWidth !== appliedW || window.innerHeight !== appliedH) onResize();
       stats.push(ticker.deltaMS);
-      if (governor.push(ticker.deltaMS)) scene.setQuality(governor.level);
+      if (governor.push(ticker.deltaMS)) host.scene.setQuality(governor.level);
       const t0 = performance.now();
-      scene.update(ticker.deltaMS);
+      host.scene.update(ticker.deltaMS);
       session.update(ticker.deltaMS);
       cpu.push(performance.now() - t0);
       if (window.__lantern && !window.__lantern.ready) {

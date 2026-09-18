@@ -716,7 +716,8 @@ textarea:focus-visible {
 .switch[aria-checked='true']::after {
   transform: translateX(22px);
 }
-.sizes {
+.sizes,
+.scenes {
   display: flex;
   gap: 6px;
 }

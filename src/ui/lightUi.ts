@@ -1,6 +1,7 @@
 import { HOLD_MS } from '../config';
 import type { MotionLevel } from '../engine/motion';
 import { COPY, type Mode } from '../ritual/copy';
+import type { SceneKind } from '../scene/field';
 import { button, el } from './dom';
 import { focusFirst } from './focus';
 
@@ -24,6 +25,7 @@ export class LightUi {
   private readonly shareBtn: HTMLButtonElement;
   private hintTimer = 0;
   private side: 'left' | 'right' = 'left';
+  private kind: SceneKind = 'sky';
 
   constructor(
     root: HTMLElement,
@@ -49,6 +51,12 @@ export class LightUi {
 
   setMotion(motion: MotionLevel): void {
     this.root.classList.toggle('gentle', motion === 'gentle');
+  }
+
+  /** The scene decides the release wording: a sky lantern rises, a water lantern drifts (ROADMAP 4.1). */
+  setSceneKind(kind: SceneKind): void {
+    this.kind = kind;
+    this.releaseBtn.textContent = kind === 'water' ? COPY.water.letItDrift : COPY.release.letItRise;
   }
 
   /**
@@ -129,7 +137,7 @@ export class LightUi {
 
   lit(): void {
     this.stage.dataset['state'] = 'lit';
-    this.say(COPY.light.lit);
+    this.say(this.kind === 'water' ? COPY.water.lit : COPY.light.lit);
     this.ring.classList.remove('holding');
     this.ring.classList.add('done');
     this.showButtons(this.releaseBtn);

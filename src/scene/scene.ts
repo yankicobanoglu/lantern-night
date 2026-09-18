@@ -10,6 +10,7 @@ import type { QualityLevel } from '../engine/quality';
 import { PALETTE } from '../palette';
 import type { MoonFrame } from '../ritual/moonPhase';
 import { Cozy } from './cozy';
+import type { Field, SceneKind } from './field';
 import { Fireflies } from './fireflies';
 import { drawHills, type Window } from './hills';
 import { Lake } from './lake';
@@ -20,10 +21,17 @@ import { ShootingStar } from './shootingStar';
 import { bandBoundaries, drawSkyBands, drawStars, type Star } from './sky';
 import { SkyLights } from './skyLights';
 
+/**
+ * One world for the ritual. The kind (ROADMAP 4.1) says what the lantern is
+ * and where it goes: `sky` lanterns rise from the shore into the sky band,
+ * `water` lanterns drift out across the lake. Everything else (sky, hills,
+ * cottages, lake, shore, moon, fireflies, boat, mist, shooting star) is shared.
+ */
 export class Scene {
   readonly pipeline: Pipeline;
   readonly moon: Moon;
   readonly lanterns: LanternField;
+  /** Past lanterns as lights, in the kind's field (the sky, or the lake). */
   readonly skyLights: SkyLights;
   readonly fireflies: Fireflies;
   readonly cozy: Cozy;
@@ -50,7 +58,14 @@ export class Scene {
   starDone = false;
   layout: Layout;
 
-  constructor(renderer: Renderer, stage: Container, layout: Layout, readonly seed: number, motion: MotionLevel) {
+  constructor(
+    renderer: Renderer,
+    stage: Container,
+    layout: Layout,
+    readonly seed: number,
+    motion: MotionLevel,
+    readonly kind: SceneKind = 'sky',
+  ) {
     this.layout = layout;
     this.pipeline = new Pipeline(renderer, stage, layout);
     this.staticBuf = new PixelBuffer(1, 1);
@@ -60,9 +75,9 @@ export class Scene {
     this.overlaySprite = new Sprite();
     this.shoreSprite = new Sprite();
     this.moon = new Moon(layout, this.pipeline.light);
-    this.skyLights = new SkyLights(layout);
-    this.lanterns = new LanternField(layout, seed);
+    this.lanterns = new LanternField(layout, seed, kind);
     this.lanterns.motion = motion;
+    this.skyLights = new SkyLights(this.lanterns.field, layout.cssScale);
     this.lanterns.existingSky = () => this.skyLights.points;
     this.lanterns.onHandOff = (h) => this.skyLights.add({ seed: h.seed, sky: h.sky, status: 'rising', ...(h.id ? { id: h.id } : {}) });
     this.fireflies = new Fireflies(layout, seed, motion);
@@ -70,15 +85,26 @@ export class Scene {
     this.star = new ShootingStar(layout);
     this.star.motion = motion;
 
-    // Pixel layers, back to front.
-    this.pipeline.above.addChild(this.staticSprite, this.overlaySprite, this.cozy.smokeSprite, this.skyLights.sprite, this.moon.sprite, this.lanterns.aboveLayer);
+    // Pixel layers, back to front. Sky lights sit above the shoreline, so the lake reflects them;
+    // water lights sit on the lake itself, in front of the reflection and behind the boat.
     this.lake = new Lake(layout, this.pipeline.aboveRT);
-    this.pipeline.world.addChild(this.lake.container, this.cozy.boatSprite, this.lanterns.nearLayer, this.shoreSprite, this.fireflies.sprite);
-    // Light layer: sky halos under the lanterns' own light, fireflies on top.
+    if (kind === 'water') {
+      this.pipeline.above.addChild(this.staticSprite, this.overlaySprite, this.cozy.smokeSprite, this.moon.sprite, this.lanterns.aboveLayer);
+      this.pipeline.world.addChild(this.lake.container, this.skyLights.sprite, this.cozy.boatSprite, this.lanterns.nearLayer, this.shoreSprite, this.fireflies.sprite);
+    } else {
+      this.pipeline.above.addChild(this.staticSprite, this.overlaySprite, this.cozy.smokeSprite, this.skyLights.sprite, this.moon.sprite, this.lanterns.aboveLayer);
+      this.pipeline.world.addChild(this.lake.container, this.cozy.boatSprite, this.lanterns.nearLayer, this.shoreSprite, this.fireflies.sprite);
+    }
+    // Light layer: light halos under the lanterns' own light, fireflies on top.
     this.pipeline.light.addChild(this.cozy.light, this.skyLights.halos, this.lanterns.lightLayer, this.fireflies.light, this.star.container);
 
     this.slow = new SlowTick(SLOW_TICK_HZ, (t) => this.slowTick(t));
     this.build(layout);
+  }
+
+  /** Where this scene's lights settle (normalised points map through it). */
+  get field(): Field {
+    return this.lanterns.field;
   }
 
   build(layout: Layout): void {
@@ -142,8 +168,8 @@ export class Scene {
     this.pipeline.resize(layout);
     this.star.resize(layout);
     this.lake.build(layout, this.pipeline.aboveRT);
-    this.skyLights.resize(layout);
     this.lanterns.resize(layout);
+    this.skyLights.resize(this.lanterns.field, layout.cssScale);
     this.fireflies.build(layout, motion);
     this.build(layout);
   }
@@ -167,11 +193,10 @@ export class Scene {
     this.pipeline.render();
   }
 
-  /** Tear down an offscreen scene (the share image builds one per render). Cached light textures are shared and kept. */
+  /** Tear down this scene (a scene swap, or the offscreen share render). Sprite sets and cached light textures are shared and kept. */
   destroy(): void {
     for (const l of [...this.lanterns.lanterns]) l.destroy();
     this.lanterns.lanterns.length = 0;
-    this.lanterns.tex.destroy();
     this.staticBuf.destroy();
     this.overlayBuf.destroy();
     this.shoreBuf.destroy();

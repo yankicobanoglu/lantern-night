@@ -1,11 +1,11 @@
 import { Particle, ParticleContainer, Sprite } from 'pixi.js';
 import { MAX_SKY } from '../config';
-import type { Layout } from '../engine/layout';
 import { radialGlowTexture } from '../engine/lightTextures';
 import { PixelBuffer } from '../engine/pixelBuffer';
 import type { QualityLevel } from '../engine/quality';
 import { hash01 } from '../engine/rng';
 import { PALETTE } from '../palette';
+import type { Field } from './field';
 import type { SkyPoint } from './skyPoint';
 import { SKY_LIGHT_PALETTE, skyLightMap, type SkyStatus } from './sprites/lantern';
 
@@ -15,6 +15,8 @@ export type SkyLight = { seed: number; sky: SkyPoint; status: SkyStatus; id?: st
  * Past lanterns as small warm lights (SPEC section 7 "Stars vs past lanterns"):
  * ≥ 2×2 art px in the lantern colour with a slow bob, drawn on the slow tick
  * into a pixel overlay; a tiny additive halo per light in a particle container.
+ * The field says which band of the world they live in: the sky above the
+ * horizon, or the far half of the lake in the water scene.
  */
 export class SkyLights {
   readonly sprite: Sprite;
@@ -24,9 +26,13 @@ export class SkyLights {
   private particles: Particle[] = [];
   private lastTick = 0;
 
-  constructor(private layout: Layout) {
-    this.buf = new PixelBuffer(layout.width, layout.horizon);
+  constructor(
+    private field: Field,
+    private cssScale: number,
+  ) {
+    this.buf = new PixelBuffer(field.width, field.height);
     this.sprite = new Sprite(this.buf.toTexture());
+    this.sprite.position.set(0, field.top);
     this.halos = new ParticleContainer({
       dynamicProperties: { position: true, alpha: true, scale: false, rotation: false, color: false, vertex: false },
       texture: radialGlowTexture(64, PALETTE.glow, 0.8),
@@ -74,28 +80,31 @@ export class SkyLights {
     this.drawTick(this.lastTick);
   }
 
+  /** Vertical bob in art px: a slow drift in the sky, a smaller rock on the water. */
   private bob(i: number, tSec: number): number {
     const l = this.lights[i]!;
-    return Math.sin(tSec * 0.35 + hash01(l.seed, 21) * Math.PI * 2) * 0.9;
+    const amp = this.field.kind === 'water' ? 0.5 : 0.9;
+    return Math.sin(tSec * 0.35 + hash01(l.seed, 21) * Math.PI * 2) * amp;
   }
 
+  /** Top-left of the dot in the field's own buffer (art px). */
   private art(i: number): { x: number; y: number; size: number } {
     const l = this.lights[i]!;
     const size = l.status === 'came-true' ? 5 : 4;
-    return { x: Math.round(l.sky.x * this.layout.width - size / 2), y: Math.round(l.sky.y * this.layout.horizon - size / 2), size };
+    return { x: Math.round(l.sky.x * this.field.width - size / 2), y: Math.round(l.sky.y * this.field.height - size / 2), size };
   }
 
   private placeHalo(i: number, tSec: number): void {
     const p = this.particles[i];
     const l = this.lights[i];
     if (!p || !l) return;
-    const css = this.layout.cssScale;
+    const css = this.cssScale;
     const { x, y, size } = this.art(i);
     const d = (size === 5 ? 18 : 14) * css;
     p.scaleX = d / 64;
     p.scaleY = d / 64;
     p.x = (x + size / 2) * css;
-    p.y = (y + size / 2 + this.bob(i, tSec)) * css;
+    p.y = (this.field.top + y + size / 2 + this.bob(i, tSec)) * css;
     p.alpha = l.status === 'let-go' ? 0.3 : l.status === 'came-true' ? 0.9 : 0.7;
   }
 
@@ -125,11 +134,13 @@ export class SkyLights {
     this.sprite.destroy();
   }
 
-  resize(layout: Layout): void {
-    this.layout = layout;
+  resize(field: Field, cssScale: number): void {
+    this.field = field;
+    this.cssScale = cssScale;
     this.buf.destroy();
-    this.buf = new PixelBuffer(layout.width, layout.horizon);
+    this.buf = new PixelBuffer(field.width, field.height);
     this.sprite.texture = this.buf.toTexture();
+    this.sprite.position.set(0, field.top);
     this.drawTick(this.lastTick);
     this.update(0);
   }

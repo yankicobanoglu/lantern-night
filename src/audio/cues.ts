@@ -12,6 +12,8 @@ export function dbToGain(db: number): number {
 export const MASTER_DB = -18;
 /** The master fades in over 2 s. */
 export const MASTER_FADE_S = 2;
+/** Cricket layer gain (the first per-layer mix control, ROADMAP 1.5): a little lower after the M6 review, about −3 dB. */
+export const CRICKET_LEVEL = 0.7;
 
 /** C major pentatonic, C5 D5 E5 G5 A5, in Hz. */
 export const CHIME_NOTES = [523.25, 587.33, 659.25, 783.99, 880.0] as const;

@@ -23,6 +23,8 @@ export type Layout = {
   centreX: number;
   /** Where an unlit lantern waits, in art px (centre of the 26×34 sprite), held just above the shore. */
   lanternRest: { x: number; y: number };
+  /** Where an unlit water lantern waits (centre of the 20×15 sprite), on the near water at the shore's edge. */
+  waterRest: { x: number; y: number };
 };
 
 /**
@@ -62,5 +64,6 @@ export function computeLayout(cssWidth: number, cssHeight: number, dpr: number):
     moon,
     centreX,
     lanternRest: { x: centreX, y: lakeEnd - 26 },
+    waterRest: { x: centreX, y: lakeEnd - 10 },
   };
 }

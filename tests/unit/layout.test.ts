@@ -38,6 +38,10 @@ describe('computeLayout', () => {
       expect(l.lanternRest.y + 17).toBeLessThan(l.lakeEnd);
       expect(l.lanternRest.y + 17).toBeGreaterThan(l.lakeEnd - 14);
       expect(l.lanternRest.y - 17).toBeGreaterThan(l.hillsEnd);
+      // The water lantern (20×15) waits on the near water, its float just above the shore's edge.
+      expect(l.waterRest.x).toBe(l.centreX);
+      expect(l.waterRest.y + 8).toBeLessThanOrEqual(l.lakeEnd);
+      expect(l.waterRest.y - 8).toBeGreaterThan(l.hillsEnd);
     }
   });
 

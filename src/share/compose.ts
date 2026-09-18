@@ -2,6 +2,7 @@ import { Container, RenderTexture, type Renderer } from 'pixi.js';
 import { computeLayout } from '../engine/layout';
 import type { MoonFrame } from '../ritual/moonPhase';
 import { COPY } from '../ritual/copy';
+import type { SceneKind } from '../scene/field';
 import { Scene } from '../scene/scene';
 import type { SkyLight } from '../scene/skyLights';
 
@@ -21,6 +22,9 @@ export type ShareInput = {
   wish: string | null;
   /** Session light arc position, so the image matches the screen. */
   evening: number;
+  /** The scene in use (ROADMAP 4.1) and tonight's moon size (4.6). */
+  kind: SceneKind;
+  supermoon: boolean;
 };
 
 /** Wait for the two fonts the image uses; drawing goes ahead with fallbacks if they never come. */
@@ -71,8 +75,9 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 export async function composeShareCanvas(input: ShareInput): Promise<HTMLCanvasElement> {
   const layout = computeLayout(SHARE_W, SHARE_H, 1);
   const stage = new Container();
-  const scene = new Scene(input.renderer, stage, layout, input.seed, 'full');
+  const scene = new Scene(input.renderer, stage, layout, input.seed, 'full', input.kind);
   scene.setMoonFrame(input.moonFrame);
+  scene.moon.setSupermoon(input.supermoon);
   scene.setEvening(input.evening);
   for (const l of input.skyLights) scene.skyLights.add({ seed: l.seed, sky: l.sky, status: l.status });
   for (const p of input.rising) scene.lanterns.spawnRising(Math.max(0.02, Math.min(0.98, p)));

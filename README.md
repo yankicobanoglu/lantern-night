@@ -61,6 +61,14 @@ If the mean frame time stays above 20 ms for 2 s the scene steps down a level: f
 
 Over the first three minutes the horizon eases from apricot to plum: the three warm sky bands give up their height in turn and the night band grows. The share image is composed at the same point of the arc.
 
+### Scenes
+
+Settings has a Scene row. **Sky lanterns** is the ritual as specified: the lantern rises from the shore and settles in the sky. **Water lanterns** plays in the same world with a floating paper lantern that drifts out across the lake and settles as a light on the water. A stored lantern keeps one normalised point; each scene interprets it through its own field (the sky band, or the far half of the lake), so the same sky shows in either scene and backups are unchanged. Changing the scene swaps the world live and carries every light over. `src/scene/field.ts` holds the fields, `src/scene/host.ts` the swap.
+
+### Real-night events
+
+Computed locally from the date, nothing fetched. On the nights of the annual meteor showers (Quadrantids, Lyrids, Eta Aquariids, Perseids, Orionids, Leonids, Geminids, Ursids) shooting stars come two to three and a half times as often. On a supermoon night (a full moon within about 0.1 of an anomalistic month of perigee) the moon is drawn as a 36 px disc instead of 32, on the same pixel grid. `src/ritual/nightEvents.ts`.
+
 ## Test hooks (query parameters)
 
 All of these are for tests and screenshots; none change what a visitor sees by default.
@@ -77,6 +85,8 @@ All of these are for tests and screenshots; none change what a visitor sees by d
 | `?install=ios\|prompt` | force an install-hint path |
 | `?quality=1\|2\|3` | pin the quality level (the governor is off) |
 | `?evening=0..1` | pin the session light arc |
+| `?scene=sky\|water` | pin the scene at boot (the Scene setting still swaps it) |
+| `?supermoon` | draw the larger moon regardless of the date |
 | `?debug` | fps, frame and CPU times, quality level overlay |
 
 `window.__lantern` exposes the same things to Playwright (stats, pixel sampling of the art-px world, the hold and ritual state, the store, the share image and more; see `src/debug.ts`).

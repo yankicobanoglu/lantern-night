@@ -1,4 +1,6 @@
-/** SPEC section 6 data types, verbatim. */
+import type { SceneKind } from '../scene/field';
+
+/** SPEC section 6 data types, verbatim, plus the additive keys added since. */
 export type LanternStatus = 'rising' | 'came-true' | 'still-growing' | 'let-go';
 
 export type Lantern = {
@@ -23,6 +25,8 @@ export type Settings = {
   starHintShown: boolean;
   /** The one-time sound hint has been shown. */
   soundHintShown: boolean;
+  /** Which world the ritual plays in (ROADMAP 4.1). Additive: old settings and backups read as 'sky'. */
+  scene: SceneKind;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -35,6 +39,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lastBackupAt: null,
   starHintShown: false,
   soundHintShown: false,
+  scene: 'sky',
 };
 
 export const RETURN_DAYS = 30;

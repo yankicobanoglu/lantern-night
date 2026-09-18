@@ -54,6 +54,11 @@ export const COPY = {
     lightAnother: 'Light another',
     goodnight: 'Goodnight',
   },
+  /** Water scene (not in the deck; proposed in PLAN-M6): the deck's "let it rise" reads wrong for a lantern on the water. */
+  water: {
+    lit: 'Beautiful. Now breathe out, and let it drift.',
+    letItDrift: 'Let it drift',
+  },
   goodnight: {
     wish: 'Sleep well. Your lanterns will keep glowing.',
     letGo: "Rest easy. You've made some room tonight.",
@@ -110,6 +115,9 @@ export const COPY = {
     /** Mute toggle labels (not in the deck; proposed in PLAN-M4). */
     soundOn: 'Sound on',
     soundOff: 'Sound off',
+    /** Scene row (not in the deck; proposed in PLAN-M6 for ROADMAP 4.1). */
+    scene: 'Scene',
+    scenes: { sky: 'Sky lanterns', water: 'Water lanterns' },
     /** Small print at the foot of Settings (not in the deck; proposed after the M5 review). */
     legal: 'Privacy: your lanterns stay on this device and never leave it. Terms: Lantern Night is offered as is, for reflection only. Back up your sky now and then.',
   },
